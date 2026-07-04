@@ -43,6 +43,14 @@
       "notes": ""
     },
     {
+      "name": "cnpmcore",
+      "upstream": "cnpm/cnpmcore",
+      "branch": "master",
+      "packageManager": "npm",
+      "monorepo": false,
+      "notes": "backend (egg.js) using vite-plus (vp lint/fmt) + vitest; commits all lockfiles but packageManager field is npm"
+    },
+    {
       "name": "codiff",
       "upstream": "nkzw-tech/codiff",
       "branch": "main",
