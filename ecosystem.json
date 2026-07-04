@@ -1,0 +1,510 @@
+{
+  "org": "vite-plus-ecosystem-ci",
+  "description": "Catalog of real-world app forks used to smoke-test vite-plus pre-releases. Source of truth for tooling and the release-manager skill.",
+  "fields": {
+    "name": "fork repo name under the org",
+    "upstream": "original owner/repo the fork tracks",
+    "branch": "the branch to test (often NOT the fork default branch)",
+    "packageManager": "pnpm | npm | yarn | bun | node (no committed lockfile) | other (non-JS)",
+    "monorepo": "workspace / packages layout present",
+    "notes": "free-form (e.g. CI runs on push only, special setup)"
+  },
+  "repos": [
+    {
+      "name": "agentsview",
+      "upstream": "kenn-io/agentsview",
+      "branch": "main",
+      "packageManager": "other",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "anywidget",
+      "upstream": "manzt/anywidget",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "bippy",
+      "upstream": "aidenybai/bippy",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "brazilian-utils-javascript",
+      "upstream": "brazilian-utils/javascript",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "codiff",
+      "upstream": "nkzw-tech/codiff",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "CI triggers on push only; PRs do not run CI unless the workflow adds a pull_request trigger"
+    },
+    {
+      "name": "critical",
+      "upstream": "addyosmani/critical",
+      "branch": "master",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "cs-demo-manager",
+      "upstream": "akiver/cs-demo-manager",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "css-modules-kit",
+      "upstream": "mizdra/css-modules-kit",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "delta-comic",
+      "upstream": "delta-comic/delta-comic",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "CI triggers on push only; PRs do not run CI unless the workflow adds a pull_request trigger"
+    },
+    {
+      "name": "digital-signature",
+      "upstream": "Jisu-Woniu/digital-signature",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "dotabod-backend",
+      "upstream": "dotabod/backend",
+      "branch": "master",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "dotabod-frontend",
+      "upstream": "dotabod/frontend",
+      "branch": "master",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "elysia-clerk",
+      "upstream": "wobsoriano/elysia-clerk",
+      "branch": "main",
+      "packageManager": "bun",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "eslint-plugin-oxlint",
+      "upstream": "oxc-project/eslint-plugin-oxlint",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "f3-app",
+      "upstream": "fisand/f3-app",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "faasjs",
+      "upstream": "faasjs/faasjs",
+      "branch": "main",
+      "packageManager": "npm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "fate",
+      "upstream": "nkzw-tech/fate",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "freecut",
+      "upstream": "walterlow/freecut",
+      "branch": "main",
+      "packageManager": "npm",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "gitify",
+      "upstream": "gitify-app/gitify",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "Ivy-Framework",
+      "upstream": "Ivy-Interactive/Ivy-Framework",
+      "branch": "development",
+      "packageManager": "other",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "jaeger-ui",
+      "upstream": "jaegertracing/jaeger-ui",
+      "branch": "main",
+      "packageManager": "npm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "koel",
+      "upstream": "koel/koel",
+      "branch": "master",
+      "packageManager": "pnpm",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "matterviz",
+      "upstream": "janosh/matterviz",
+      "branch": "main",
+      "packageManager": "node",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "mcp-omnisearch",
+      "upstream": "spences10/mcp-omnisearch",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "media-processors",
+      "upstream": "shiguredo/media-processors",
+      "branch": "develop",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "mlx-node",
+      "upstream": "mlx-node/mlx-node",
+      "branch": "main",
+      "packageManager": "yarn",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "monorepo",
+      "upstream": "zap-studio/monorepo",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "museeks",
+      "upstream": "martpie/museeks",
+      "branch": "master",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "nostalgist",
+      "upstream": "arianrhodsandlot/nostalgist",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "notero",
+      "upstream": "dvanoni/notero",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "ohbug",
+      "upstream": "ohbug-org/ohbug",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "OneSignal-Website-SDK",
+      "upstream": "OneSignal/OneSignal-Website-SDK",
+      "branch": "main",
+      "packageManager": "bun",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "oxc-playground",
+      "upstream": "oxc-project/playground",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "oxc-walker",
+      "upstream": "oxc-project/oxc-walker",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "pdfme",
+      "upstream": "pdfme/pdfme",
+      "branch": "main",
+      "packageManager": "npm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "pinia-shared-state",
+      "upstream": "wobsoriano/pinia-shared-state",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "rari",
+      "upstream": "rari-build/rari",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "react-doctor",
+      "upstream": "millionco/react-doctor",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "react-native-onesignal",
+      "upstream": "OneSignal/react-native-onesignal",
+      "branch": "main",
+      "packageManager": "bun",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "redis-me",
+      "upstream": "hepengju/redis-me",
+      "branch": "master",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "regle",
+      "upstream": "victorgarciaesgi/regle",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "remdx",
+      "upstream": "nkzw-tech/remdx",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "sigle",
+      "upstream": "sigle/sigle",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "solid-services",
+      "upstream": "Exelord/solid-services",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "svelte-multiselect",
+      "upstream": "janosh/svelte-multiselect",
+      "branch": "main",
+      "packageManager": "node",
+      "monorepo": false,
+      "notes": ""
+    },
+    {
+      "name": "tech-interview-handbook",
+      "upstream": "yangshun/tech-interview-handbook",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "trpc-nuxt",
+      "upstream": "wobsoriano/trpc-nuxt",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "typed-xlsx",
+      "upstream": "ChronicStone/typed-xlsx",
+      "branch": "main",
+      "packageManager": "bun",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "unplugin-turbo-console",
+      "upstream": "unplugin/unplugin-turbo-console",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "urllib",
+      "upstream": "node-modules/urllib",
+      "branch": "master",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "v-offline",
+      "upstream": "vinayakkulkarni/v-offline",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "varlet",
+      "upstream": "varletjs/varlet",
+      "branch": "dev",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "vibe-dashboard",
+      "upstream": "voidzero-dev/vibe-dashboard",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "vitepress-carbon",
+      "upstream": "brenoepics/vitepress-carbon",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "vitepress-plugin-group-icons",
+      "upstream": "yuyinws/vitepress-plugin-group-icons",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "vize",
+      "upstream": "ubugeeei/vize",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "vue-clamp",
+      "upstream": "Justineo/vue-clamp",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "vue-core",
+      "upstream": "vuejs/core",
+      "branch": "minor",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "vueleaflet",
+      "upstream": "brandonxiang/vueleaflet",
+      "branch": "next",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "web-app-template",
+      "upstream": "nkzw-tech/web-app-template",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "yaak",
+      "upstream": "mountain-loop/yaak",
+      "branch": "main",
+      "packageManager": "npm",
+      "monorepo": true,
+      "notes": ""
+    },
+    {
+      "name": "zerobyte",
+      "upstream": "nicotsx/zerobyte",
+      "branch": "main",
+      "packageManager": "bun",
+      "monorepo": true,
+      "notes": ""
+    }
+  ]
+}
