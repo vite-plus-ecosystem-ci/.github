@@ -119,10 +119,57 @@ jq -r '.repos[] | select(.packageManager=="other") | "\(.name) (\(.upstream))"' 
 
 Prefer a fork whose pinned `vite-plus` version is the immediately previous release, so migrate does a real upgrade rather than a no-op.
 
+## Smoke-test via a fork PR (CI)
+
+To validate a prerelease against a project's real CI (not just a local `vp migrate`), open a draft PR on the fork and let its CI run. The mandatory rule above still applies: the PR targets the fork, never upstream.
+
+### 1. Sync from source, then branch
+
+Always start the test branch from the latest upstream code, not the (possibly stale) fork branch. Sync the tracked branch from the `source` remote and branch off it:
+
+```bash
+name=<name>; branch=<tracked-branch>; version=<vite-plus-prerelease>   # branch from ecosystem.json; version = the build under test
+cd ~/git/github.com/vite-plus-ecosystem-ci/$name
+git fetch source
+git switch -c "update-vite-plus-prerelease-test-$version" "source/$branch"
+```
+
+Branch name convention (required): **`update-vite-plus-prerelease-test-{version}`**, where `{version}` is the vite-plus prerelease under test (a preview build `0.0.0-commit.<sha>`, or a tagged prerelease like `0.2.3-alpha.1`).
+
+### 2. Apply the upgrade
+
+Upgrade vite-plus on that branch (e.g. `vp migrate` from the preview build; see the release-manager skill or the local harness). Commit only what the upgrade changes, typically `package.json` and the bridge `.npmrc` (force-add it if the project gitignores `.npmrc`); never commit `node_modules`. Projects that commit no lockfile install fresh in CI.
+
+### 3. Draft PR on the fork, assigned to the release manager
+
+Open the PR **as a draft**, based on the tracked branch, under `vite-plus-ecosystem-ci`, and **assign it to the release manager**:
+
+```bash
+gh pr create --repo vite-plus-ecosystem-ci/$name --base "$branch" \
+  --head "update-vite-plus-prerelease-test-$version" --draft \
+  --assignee <release-manager> \
+  --title "test: vite-plus prerelease $version" \
+  --body "Ecosystem-ci smoke test. Draft / do not merge."
+
+# confirm the PR is within the fork (never upstream):
+gh pr view <PR#> --repo vite-plus-ecosystem-ci/$name --json isCrossRepository --jq '.isCrossRepository'   # must be false
+```
+
+### 4. Collect links and watch CI
+
+Once all PRs are open, list them in a table for review (project, PR link, base, prerelease, assignee, CI status), then check each PR's CI for **upgrade-related** failures:
+
+```bash
+gh pr checks <PR#> --repo vite-plus-ecosystem-ci/$name
+```
+
+Distinguish an upgrade failure (the prerelease does not resolve, build, or test, and the error references the prerelease version) from pre-existing or infra flakiness (missing DB service, network, unrelated lint). When a job fails at install, read its log: `gh api repos/vite-plus-ecosystem-ci/$name/actions/jobs/<job-id>/logs`.
+
 ## CI caveats
 
 - Some forks trigger CI on `push` only, not `pull_request` (flagged in `notes`, e.g. `codiff`, `delta-comic`). Opening a PR against them does not run their CI. If PR CI is required, add a `pull_request` trigger to the workflow's `on:` block **inside the ecosystem-ci PR**, not as a standalone commit on the tracked branch, so the fork stays clean against upstream.
 - Keep the tracked branch clean: do not land unrelated commits on it. It should differ from upstream only by what a release test needs.
+- **Non-standard installers do not resolve preview builds.** The preview-build smoke test needs the project's CI to resolve `vite-plus@0.0.0-commit.<sha>` through the registry bridge written into `.npmrc`. That works for npm/pnpm/yarn/bun; it fails for installers that ignore the `.npmrc` `registry=` or use their own. Known case: `cnpmcore`'s CI installs with `utoo` (`ut`, via `utooland/setup-utoo`), which resolves against public npm and 404s on the commit build (`No matching version found ... from N available versions`). Check a candidate's CI install step before trusting fork-CI results, and record known cases in `notes`.
 
 ## Maintaining the catalog
 
@@ -160,6 +207,6 @@ comm -3 \
 
 The `release-manager` skill's smoke-test step should link here instead of embedding the catalog or the setup steps:
 
-> Smoke-test targets and local setup: https://github.com/vite-plus-ecosystem-ci/.github/blob/main/TESTING.md . Pick a target from `ecosystem.json`, clone on its tracked branch (`scripts/setup-local.sh <name>`), then run `test-pkg-pr-new-migrate.sh`. Any test PR must be opened against the `vite-plus-ecosystem-ci` fork, never the upstream repo.
+> Smoke-test targets and local setup: https://github.com/vite-plus-ecosystem-ci/.github/blob/main/TESTING.md . Pick a target from `ecosystem.json`, clone on its tracked branch (`scripts/setup-local.sh <name>`), then run `test-pkg-pr-new-migrate.sh`. To validate in the fork's CI, follow "Smoke-test via a fork PR": branch `update-vite-plus-prerelease-test-<version>` synced from `source`, open a draft PR on the fork assigned to the release manager, then watch CI. Any test PR must be opened against the `vite-plus-ecosystem-ci` fork, never the upstream repo.
 
 That keeps the churn (which repos exist, which branch each tracks) here, and keeps the release process in vite-plus.
