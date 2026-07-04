@@ -140,7 +140,7 @@ scripts/enable-actions.sh "$name"
 # 3. add an entry to ecosystem.json (name, upstream, branch, packageManager, monorepo, notes)
 ```
 
-Set `packageManager` from the `packageManager` field in `package.json` when present (authoritative): some repos commit several lockfiles to test multiple package managers (e.g. `cnpmcore` commits npm, pnpm, yarn, and bun lockfiles but declares `npm`), so lockfile presence alone is misleading. Only when the field is absent, infer from the committed lockfile (`pnpm-lock.yaml` -> pnpm, `bun.lock*` -> bun, `yarn.lock` -> yarn, `package-lock.json` -> npm, package.json only -> node, none -> other). Set `monorepo` if a `workspaces` field, `pnpm-workspace.yaml`, or a `packages/` dir is present.
+Set `packageManager` from the `packageManager` field in `package.json` when present; only when it is absent, infer from the committed lockfile (`pnpm-lock.yaml` -> pnpm, `bun.lock*` -> bun, `yarn.lock` -> yarn, `package-lock.json` -> npm, package.json only -> node, none -> other). Lockfile presence alone is unreliable: some repos gitignore their lockfile entirely (e.g. `cnpmcore` commits no lockfile and declares `npm`). Also check **how the project's CI installs**, since a non-standard installer can break the preview-build smoke test: `cnpmcore`'s CI installs with `utoo` (`ut`), which does not resolve `vite-plus@0.0.0-commit.<sha>` through the bridge `.npmrc`, so its smoke test fails at dependency resolution (record this in `notes`). Set `monorepo` if a `workspaces` field, `pnpm-workspace.yaml`, or a `packages/` dir is present.
 
 ### Remove a repo
 

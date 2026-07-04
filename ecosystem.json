@@ -48,7 +48,7 @@
       "branch": "master",
       "packageManager": "npm",
       "monorepo": false,
-      "notes": "backend (egg.js) using vite-plus (vp lint/fmt) + vitest; commits all lockfiles but packageManager field is npm"
+      "notes": "backend (egg.js) using vite-plus + vitest; commits NO lockfile (package-lock/pnpm-lock gitignored); packageManager field says npm but CI installs via utoo (ut, utooland/setup-utoo), which does NOT resolve vite-plus preview builds through the bridge .npmrc, so preview-build smoke tests fail at dependency resolution"
     },
     {
       "name": "codiff",
