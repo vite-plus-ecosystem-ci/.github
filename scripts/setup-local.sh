@@ -48,5 +48,12 @@ for name in $targets; do
     git -C "$target" remote add source "git@github.com:$upstream.git"
   fi
 
-  echo "OK  $name -> $(git -C "$target" rev-parse --abbrev-ref HEAD)  (source: $upstream)"
+  # Pin gh's default (base) repo to the fork so `gh pr create` never targets the
+  # upstream. A fork clone otherwise defaults its PR base to the parent repo, and
+  # the source remote above makes that mistake easy. Test PRs MUST go to the fork.
+  if command -v gh >/dev/null; then
+    ( cd "$target" && gh repo set-default "$ORG/$name" >/dev/null 2>&1 ) || true
+  fi
+
+  echo "OK  $name -> $(git -C "$target" rev-parse --abbrev-ref HEAD)  (source: $upstream; base repo pinned to fork)"
 done

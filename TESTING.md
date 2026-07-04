@@ -4,6 +4,35 @@ Canonical guidance for smoke-testing [vite-plus](https://github.com/voidzero-dev
 
 This document is the source of truth. The vite-plus `release-manager` skill links here and stays minimal, so the catalog and the setup rules can change here without touching vite-plus.
 
+## Mandatory rule: test PRs target the fork, never the upstream
+
+**Every test / submission PR must be opened against the `vite-plus-ecosystem-ci` fork, never against the original upstream repo.** This is a hard rule with no exceptions. A smoke-test PR is a vite-plus version bump; opening it against `vuejs/core`, `cloudflare/vinext`, `varletjs/varlet`, etc. spams real maintainers with noise and can leak a prerelease.
+
+The trap: `gh pr create` inside a fork **defaults its base repo to the parent (upstream)**, and these clones carry a `source` remote pointing at the upstream, so the wrong target is one careless Enter away. Guard against it:
+
+```bash
+name=<name>; branch=<tracked-branch>          # from ecosystem.json
+cd ~/git/github.com/vite-plus-ecosystem-ci/$name
+
+gh repo set-default vite-plus-ecosystem-ci/$name        # pin gh's base repo to the fork
+
+git switch -c test/bump-vp-<version> "$branch"          # test branch off the tracked branch
+# ... apply the vite-plus bump, commit ...
+git push -u origin test/bump-vp-<version>
+
+# open the PR explicitly against the fork, base = the tracked branch:
+gh pr create --repo vite-plus-ecosystem-ci/$name --base "$branch" \
+  --head test/bump-vp-<version> --title "test: vite-plus <version>" --fill
+```
+
+Confirm the target before and after submitting; the URL must be under `vite-plus-ecosystem-ci`, never the upstream owner:
+
+```bash
+gh pr view --repo vite-plus-ecosystem-ci/$name --json url --jq .url
+```
+
+`scripts/setup-local.sh` runs `gh repo set-default` on every clone it sets up, so `gh pr create` defaults to the fork.
+
 ## Catalog
 
 [`ecosystem.json`](./ecosystem.json) is the machine-readable list of forks. Each entry:
@@ -131,6 +160,6 @@ comm -3 \
 
 The `release-manager` skill's smoke-test step should link here instead of embedding the catalog or the setup steps:
 
-> Smoke-test targets and local setup: https://github.com/vite-plus-ecosystem-ci/.github/blob/main/TESTING.md . Pick a target from `ecosystem.json`, clone on its tracked branch (`scripts/setup-local.sh <name>`), then run `test-pkg-pr-new-migrate.sh`.
+> Smoke-test targets and local setup: https://github.com/vite-plus-ecosystem-ci/.github/blob/main/TESTING.md . Pick a target from `ecosystem.json`, clone on its tracked branch (`scripts/setup-local.sh <name>`), then run `test-pkg-pr-new-migrate.sh`. Any test PR must be opened against the `vite-plus-ecosystem-ci` fork, never the upstream repo.
 
 That keeps the churn (which repos exist, which branch each tracks) here, and keeps the release process in vite-plus.
