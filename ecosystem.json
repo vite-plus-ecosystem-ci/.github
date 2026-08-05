@@ -227,14 +227,6 @@
       "notes": ""
     },
     {
-      "name": "monorepo",
-      "upstream": "zap-studio/monorepo",
-      "branch": "main",
-      "packageManager": "pnpm",
-      "monorepo": true,
-      "notes": ""
-    },
-    {
       "name": "museeks",
       "upstream": "martpie/museeks",
       "branch": "master",
