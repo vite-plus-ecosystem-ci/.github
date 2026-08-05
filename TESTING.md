@@ -134,11 +134,38 @@ git fetch source
 git switch -c "update-vite-plus-prerelease-test-$version" "source/$branch"
 ```
 
+**Fast-forward the fork's tracked branch to upstream first.** Branching off `source/$branch` is not enough on its own: the PR is based on the *fork's* branch, so if that branch is stale the PR carries every upstream commit since the last sync instead of just the upgrade. Sync it before opening PRs, and skip any fork whose branch has commits upstream does not have rather than clobbering it:
+
+```bash
+git rev-list --left-right --count "origin/$branch...source/$branch"   # left = fork-only commits; must be 0 to sync
+git push --no-verify origin "source/$branch:refs/heads/$branch"
+```
+
+If PRs were already opened against a stale base, GitHub does not recompute their merge base when the base branch moves. Close and reopen each PR to force it (a reopened draft stays a draft).
+
 Branch name convention (required): **`update-vite-plus-prerelease-test-{version}`**, where `{version}` is the vite-plus prerelease under test (a preview build `0.0.0-commit.<sha>`, or a tagged prerelease like `0.2.3-alpha.1`).
+
+Some projects enforce their own branch-name policy in CI and will reject that name. When a `Validate branch name`-style check fails, read the pattern out of the job log and rename the branch to satisfy it for that project only; the convention above still applies everywhere else. A conventional-commit pattern such as `^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)/[a-z0-9]+(-[a-z0-9]+)*$` rejects the dots in `0.0.0-commit.<sha>`, so drop the dotted version and keep the bare sha:
+
+```bash
+git branch -f "test/vite-plus-prerelease-<sha>" "update-vite-plus-prerelease-test-$version"
+git push --no-verify -f origin "test/vite-plus-prerelease-<sha>"
+```
+
+A PR's head branch cannot be changed after creation, so close the original PR and open a new one from the renamed branch. Renaming also unblocks any jobs the branch-name gate was skipping, which may then surface their own failures.
 
 ### 2. Apply the upgrade
 
 Upgrade vite-plus on that branch (e.g. `vp migrate` from the preview build; see the release-manager skill or the local harness). Commit only what the upgrade changes, typically `package.json` and the bridge `.npmrc` (force-add it if the project gitignores `.npmrc`); never commit `node_modules`. Projects that commit no lockfile install fresh in CI.
+
+**Run `vp fmt` before committing.** Projects whose CI runs `vp check` (or `vp fmt --check`) fail on formatting the upgrade introduces: a new oxfmt version formats files the previous one left alone, so code untouched by the upgrade suddenly fails the check. Running `vp fmt` first auto-corrects those files and folds them into the upgrade commit, leaving only genuine failures in CI:
+
+```bash
+vp fmt
+git add -A && git commit --amend --no-edit --no-verify
+```
+
+`vp migrate` installs Vite+ git hooks, so the project's own pre-commit/pre-push checks run against the test commit and can block it for pre-existing lint or type errors unrelated to the upgrade. Use `--no-verify` on both `git commit` and `git push` for these test commits.
 
 ### 3. Draft PR on the fork, assigned to the release manager
 
