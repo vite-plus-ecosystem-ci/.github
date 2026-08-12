@@ -196,21 +196,26 @@ Distinguish an upgrade failure (the prerelease does not resolve, build, or test,
 
 Across the full catalog most red checks say nothing about the release. Sort every failure into one of these before drawing a conclusion, and report the tally by cause rather than "N failed". Known per-repo cases are recorded in `notes` in `ecosystem.json`, so check there first.
 
-**1. Registry-bridge fetch flakes (re-runnable, and the most common false alarm).** The bridge occasionally drops tarball requests under load. pnpm reports `error (23). Will retry`, or the install fails with `ECONNRESET  aborted`. The dangerous variant is the platform binding: `@voidzero-dev/vite-plus-<platform>` is an **optional** dependency, so when its download exhausts pnpm's retries the install still reports success, and the job dies later with a misleading
+**1. Registry-bridge fetch flakes (re-runnable, and the most common false alarm).** The bridge occasionally drops tarball requests under load. pnpm reports `error (23). Will retry`, or the install fails with `ECONNRESET  aborted`. The dangerous variant is the platform binding: `@voidzero-dev/vite-plus-<platform>` is an **optional** dependency, so when its download exhausts pnpm's retries, pnpm skips it and still reports a successful install. The job then dies much later, at the first command that loads the binding:
 
 ```
-Error: Cannot find native binding.
+Error: Cannot find native binding. npm has a bug related to optional dependencies
+(https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing
+both package-lock.json and node_modules directory.
   cause: Cannot find module '@voidzero-dev/vite-plus-linux-x64-gnu'
 ```
 
-That message looks like the native addon was never published. Verify before believing it:
+**Read this carefully: it is a local `node_modules` resolution failure, not a statement about the registry.** Node is reporting that the package is absent from this install; nothing here checked whether it was published. The "npm has a bug related to optional dependencies" sentence is boilerplate that NAPI's generated loader appends to every binding-load failure, and it steers readers toward a packaging or publishing explanation that is almost always wrong here. The bridge publishes every platform package for every commit build, and the packument URL will serve it fine while CI is failing this way.
+
+Confirm rather than assume:
 
 ```bash
+VERSION=0.0.0-commit.<sha>
 curl -s "https://registry-bridge.viteplus.dev/@voidzero-dev%2fvite-plus-linux-x64-gnu" \
   | python3 -c "import json,sys; print('$VERSION' in json.load(sys.stdin)['versions'])"
 ```
 
-If the version is present, it was a flake. Re-run the job (`gh run rerun <run-id> --failed --repo vite-plus-ecosystem-ci/$name`) before classifying it. Always grep the install step for `error (23)` and `ECONNRESET` first.
+`True` means the package was published and the install dropped it, so the failure is a flake: re-run the job (`gh run rerun <run-id> --failed --repo vite-plus-ecosystem-ci/$name`). Only `False` would point at a publishing problem. Always grep the install step for `error (23)` and `ECONNRESET` before classifying this failure as anything else.
 
 **2. Preview-build artifacts.** Caused by the `0.0.0-commit.<sha>` version string itself, so they cannot happen for a real npm release: pnpm `ERR_PNPM_TRUST_DOWNGRADE` ("possible package takeover"), npm `ETARGET`/`notarget` and bun/pnpm minimum-release-age (`ERR_PNPM_NO_MATURE_MATCHING_VERSION`), `ERR_PNPM_TARBALL_URL_MISMATCH` or a failed supply-chain policy check against the bridge tarball URLs, `ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION` where a project declares `vite` as a peer, and Docker builds whose context does not carry the bridge `.npmrc`.
 
