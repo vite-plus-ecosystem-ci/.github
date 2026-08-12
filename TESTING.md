@@ -1,14 +1,14 @@
 # vite-plus ecosystem-ci: testing rules and guidelines
 
-Canonical guidance for smoke-testing [vite-plus](https://github.com/voidzero-dev/vite-plus) pre-releases against real-world apps. This org holds forks of real projects; a release candidate is validated by upgrading these forks to the candidate and confirming they still install, build, and test.
+This document gives the rules for smoke-testing [vite-plus](https://github.com/voidzero-dev/vite-plus) pre-releases against real-world apps. This org holds forks of real projects. To validate a release candidate, upgrade these forks to that candidate. Then confirm that each fork still installs, builds, and tests.
 
-This document is the source of truth. The vite-plus `release-manager` skill links here and stays minimal, so the catalog and the setup rules can change here without touching vite-plus.
+This document is the source of truth. The vite-plus `release-manager` skill links here and stays minimal. The catalog and the setup rules can therefore change here without a change to vite-plus.
 
 ## Mandatory rule: test PRs target the fork, never the upstream
 
-**Every test / submission PR must be opened against the `vite-plus-ecosystem-ci` fork, never against the original upstream repo.** This is a hard rule with no exceptions. A smoke-test PR is a vite-plus version bump; opening it against `vuejs/core`, `cloudflare/vinext`, `varletjs/varlet`, etc. spams real maintainers with noise and can leak a prerelease.
+**Open every test PR against the `vite-plus-ecosystem-ci` fork. Never open one against the original upstream repo.** This rule has no exceptions. A smoke-test PR is a vite-plus version bump. A bump opened against `vuejs/core`, `cloudflare/vinext`, or `varletjs/varlet` sends noise to real maintainers, and it can disclose a prerelease.
 
-The trap: `gh pr create` inside a fork **defaults its base repo to the parent (upstream)**, and these clones carry a `source` remote pointing at the upstream, so the wrong target is one careless Enter away. Guard against it:
+Two things make the wrong target easy to hit. `gh pr create` inside a fork **uses the parent (upstream) as its default base repo**. These clones also have a `source` remote that points to the upstream. Use these commands to prevent the mistake:
 
 ```bash
 name=<name>; branch=<tracked-branch>          # from ecosystem.json
@@ -25,17 +25,17 @@ gh pr create --repo vite-plus-ecosystem-ci/$name --base "$branch" \
   --head test/bump-vp-<version> --title "test: vite-plus <version>" --fill
 ```
 
-Confirm the target before and after submitting; the URL must be under `vite-plus-ecosystem-ci`, never the upstream owner:
+Check the target before you submit the PR, and again after you submit it. The URL must contain `vite-plus-ecosystem-ci`. It must never contain the upstream owner:
 
 ```bash
 gh pr view --repo vite-plus-ecosystem-ci/$name --json url --jq .url
 ```
 
-`scripts/setup-local.sh` runs `gh repo set-default` on every clone it sets up, so `gh pr create` defaults to the fork.
+`scripts/setup-local.sh` runs `gh repo set-default` on every clone that it sets up. `gh pr create` then uses the fork as its default.
 
 ## Catalog
 
-[`ecosystem.json`](./ecosystem.json) is the machine-readable list of forks. Each entry:
+[`ecosystem.json`](./ecosystem.json) is the machine-readable list of forks. Each entry has these fields:
 
 | field | meaning |
 | --- | --- |
@@ -46,21 +46,21 @@ gh pr view --repo vite-plus-ecosystem-ci/$name --json url --jq .url
 | `monorepo` | workspace / `packages` layout present |
 | `notes` | free-form (e.g. "CI runs on push only") |
 
-The set changes over time (repos are added and removed). Treat `ecosystem.json` as authoritative and keep it in sync with the actual org repos (`scripts/setup-local.sh` and `scripts/enable-actions.sh` read it; a drift check is in "Maintaining the catalog" below).
+The set of forks changes over time, because maintainers add repos and remove repos. Use `ecosystem.json` as the authoritative list. Keep it in agreement with the actual org repos. `scripts/setup-local.sh` and `scripts/enable-actions.sh` read this file. "Maintaining the catalog" below gives a drift check.
 
 ## Why a plain `gh repo clone` is not enough
 
-Three properties of these forks are easy to miss:
+These forks have three properties that are easy to miss:
 
-1. **The tracked branch is often not the default branch.** `gh repo clone` lands on the fork's default branch (inherited from upstream). For several repos that is the wrong branch to test (e.g. `vue-core` tracks `minor`, `varlet` tracks `dev`, `Ivy-Framework` tracks `development`, `media-processors` tracks `develop`, `vueleaflet` tracks `next`, and seven track `master`). Always check out `branch` from `ecosystem.json`.
-2. **The fork name can differ from the upstream repo name.** Forks are created with `--fork-name` to keep a stable, unambiguous name (e.g. `vue-core` from `vuejs/core`, `oxc-playground` from `oxc-project/playground`, `dotabod-backend` from `dotabod/backend`).
-3. **GitHub Actions must be enabled on the fork** or fork CI never runs. New forks start with Actions off, and scheduled/cron workflows stay `disabled_fork` even after the repo-level toggle is on (they are not auto-activated).
+1. **The tracked branch is often not the default branch.** `gh repo clone` checks out the fork's default branch, which the fork inherits from upstream. For several repos that branch is the wrong branch to test. For example, `vue-core` tracks `minor`, `varlet` tracks `dev`, `Ivy-Framework` tracks `development`, `media-processors` tracks `develop`, `vueleaflet` tracks `next`, and seven repos track `master`. Always check out the `branch` value from `ecosystem.json`.
+2. **The fork name can differ from the upstream repo name.** Maintainers create forks with `--fork-name` to keep a stable, unambiguous name. For example, `vue-core` comes from `vuejs/core`, `oxc-playground` comes from `oxc-project/playground`, and `dotabod-backend` comes from `dotabod/backend`.
+3. **You must enable GitHub Actions on the fork.** If Actions stays off, fork CI never runs. New forks start with Actions off. Scheduled workflows keep the `disabled_fork` state even after you turn on the repo-level setting, because that setting does not activate them.
 
 ## Verify locally
 
 ### 1. Get a local checkout on the right branch
 
-Clone under a single directory so the whole test environment cleans up in one step, and set two remotes: `origin` (the fork) and `source` (the upstream).
+Clone into one parent directory, so that one step can remove the whole test environment. Set two remotes: `origin` for the fork, and `source` for the upstream.
 
 ```bash
 DEST=~/git/github.com/vite-plus-ecosystem-ci
@@ -71,7 +71,7 @@ git -C "$DEST/$name" checkout "$branch"                 # REQUIRED: land on the 
 git -C "$DEST/$name" remote add source git@github.com:$upstream.git
 ```
 
-Or do it straight from the manifest for one repo or all of them:
+The script does the same steps from the manifest, for one repo or for all of them:
 
 ```bash
 scripts/setup-local.sh <name>     # one repo
@@ -86,7 +86,7 @@ rm -rf ~/git/github.com/vite-plus-ecosystem-ci
 scripts/enable-actions.sh <name>
 ```
 
-Equivalent by hand:
+These commands do the same work by hand:
 
 ```bash
 name=<name>
@@ -102,14 +102,14 @@ gh api repos/vite-plus-ecosystem-ci/$name/actions/workflows \
 
 ### 3. Run the smoke test
 
-Use the vite-plus harness against the local checkout (see the `release-manager` skill for release-specific arguments):
+Run the vite-plus harness against the local checkout. The `release-manager` skill gives the release-specific arguments.
 
 ```bash
 # from a vite-plus checkout:
 .github/scripts/test-pkg-pr-new-migrate.sh <PR#> ~/git/github.com/vite-plus-ecosystem-ci/<name> --no-interactive
 ```
 
-**Choosing a target.** Pick a fork whose stack matches the release's risk area, using `ecosystem.json`:
+**How to choose a target.** Select a fork whose stack matches the risk area of the release. Query `ecosystem.json`:
 
 ```bash
 jq -r '.repos[] | select(.packageManager=="bun") | .name' ecosystem.json          # bun install-path changes
@@ -117,15 +117,15 @@ jq -r '.repos[] | select(.monorepo) | .name' ecosystem.json                     
 jq -r '.repos[] | select(.packageManager=="other") | "\(.name) (\(.upstream))"' ecosystem.json  # native / non-JS
 ```
 
-Prefer a fork whose pinned `vite-plus` version is the immediately previous release, so migrate does a real upgrade rather than a no-op.
+Select a fork whose pinned `vite-plus` version is the immediately previous release. Migrate then does a real upgrade instead of no work.
 
 ## Smoke-test via a fork PR (CI)
 
-To validate a prerelease against a project's real CI (not just a local `vp migrate`), open a draft PR on the fork and let its CI run. The mandatory rule above still applies: the PR targets the fork, never upstream.
+A local `vp migrate` does not exercise the project's own CI. To do that, open a draft PR on the fork. The CI of that fork then runs against the prerelease. The mandatory rule above still applies: the PR targets the fork, never the upstream.
 
 ### 1. Sync from source, then branch
 
-Always start the test branch from the latest upstream code, not the (possibly stale) fork branch. Sync the tracked branch from the `source` remote and branch off it:
+Always start the test branch from the latest upstream code. Do not start it from the fork branch, which can be stale. First sync the tracked branch from the `source` remote. Then create the test branch from it:
 
 ```bash
 name=<name>; branch=<tracked-branch>; version=<vite-plus-prerelease>   # branch from ecosystem.json; version = the build under test
@@ -134,42 +134,42 @@ git fetch source
 git switch -c "update-vite-plus-prerelease-test-$version" "source/$branch"
 ```
 
-**Fast-forward the fork's tracked branch to upstream first.** Branching off `source/$branch` is not enough on its own: the PR is based on the *fork's* branch, so if that branch is stale the PR carries every upstream commit since the last sync instead of just the upgrade. Sync it before opening PRs, and skip any fork whose branch has commits upstream does not have rather than clobbering it:
+**Fast-forward the fork's tracked branch to upstream first.** A branch off `source/$branch` is not sufficient. The PR uses the *fork's* branch as its base. If that base is stale, the PR contains every upstream commit since the last sync, and not only the upgrade. Sync the base before you open PRs. Skip any fork whose branch has commits that the upstream does not have. Do not overwrite such a branch.
 
 ```bash
 git rev-list --left-right --count "origin/$branch...source/$branch"   # left = fork-only commits; must be 0 to sync
 git push --no-verify origin "source/$branch:refs/heads/$branch"
 ```
 
-If PRs were already opened against a stale base, GitHub does not recompute their merge base when the base branch moves. Close and reopen each PR to force it (a reopened draft stays a draft).
+GitHub does not calculate the merge base again when the base branch moves. If you already opened a PR against a stale base, close that PR and open it again. This forces a new merge-base calculation. A draft PR stays a draft after you open it again.
 
-**Re-check the divergence immediately before opening each PR, not only at the start of the run.** A full-catalog sweep takes hours, and an active upstream can move 80+ commits in that window, so a fork synced at the beginning is stale by the time its PR runs. A PR on a stale base differs from the release under test in two ways at once, which makes any failure unattributable.
+**Check the divergence again immediately before you open each PR.** Do not check it only at the start of the run. A full-catalog sweep takes hours. An active upstream can add more than 80 commits in that time. A fork that you synced at the start is therefore stale when its PR runs. A PR on a stale base differs from the release under test in two ways at the same time. You cannot then assign a cause to a failure.
 
-Branch name convention (required): **`update-vite-plus-prerelease-test-{version}`**, where `{version}` is the vite-plus prerelease under test (a preview build `0.0.0-commit.<sha>`, or a tagged prerelease like `0.2.3-alpha.1`).
+Branch name convention (required): **`update-vite-plus-prerelease-test-{version}`**. The `{version}` value is the vite-plus prerelease under test. It is a preview build `0.0.0-commit.<sha>`, or a tagged prerelease such as `0.2.3-alpha.1`.
 
-Some projects enforce their own branch-name policy in CI and will reject that name. When a `Validate branch name`-style check fails, read the pattern out of the job log and rename the branch to satisfy it for that project only; the convention above still applies everywhere else. A conventional-commit pattern such as `^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)/[a-z0-9]+(-[a-z0-9]+)*$` rejects the dots in `0.0.0-commit.<sha>`, so drop the dotted version and keep the bare sha:
+Some projects apply their own branch-name policy in CI, and that policy can reject the required name. When a `Validate branch name` check fails, read the required pattern from the job log. Then rename the branch for that project only. The convention above still applies to every other project. For example, a conventional-commit pattern such as `^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)/[a-z0-9]+(-[a-z0-9]+)*$` rejects the dots in `0.0.0-commit.<sha>`. Remove the dotted version and keep only the sha:
 
 ```bash
 git branch -f "test/vite-plus-prerelease-<sha>" "update-vite-plus-prerelease-test-$version"
 git push --no-verify -f origin "test/vite-plus-prerelease-<sha>"
 ```
 
-A PR's head branch cannot be changed after creation, so close the original PR and open a new one from the renamed branch. Renaming also unblocks any jobs the branch-name gate was skipping, which may then surface their own failures.
+You cannot change the head branch of a PR after you create it. Close the original PR. Then open a new PR from the renamed branch. The rename also lets jobs run that the branch-name gate had skipped, and those jobs can then report failures of their own.
 
 ### 2. Apply the upgrade
 
-Upgrade vite-plus on that branch (e.g. `vp migrate` from the preview build; see the release-manager skill or the local harness). Commit only what the upgrade changes, typically `package.json` and the bridge `.npmrc` (force-add it if the project gitignores `.npmrc`); never commit `node_modules`. Projects that commit no lockfile install fresh in CI.
+Upgrade vite-plus on that branch. For example, run `vp migrate` from the preview build; see the release-manager skill or the local harness. Commit only the files that the upgrade changes. These are usually `package.json` and the bridge `.npmrc`. Force-add `.npmrc` if the project ignores it in `.gitignore`. Never commit `node_modules`. Projects that commit no lockfile do a fresh install in CI.
 
-**Run `vp fmt` before committing.** Projects whose CI runs `vp check` (or `vp fmt --check`) fail on formatting the upgrade introduces: a new oxfmt version formats files the previous one left alone, so code untouched by the upgrade suddenly fails the check. Running `vp fmt` first auto-corrects those files and folds them into the upgrade commit, leaving only genuine failures in CI:
+**Run `vp fmt` before you commit.** A new oxfmt version formats files that the previous version did not format. Code that the upgrade did not touch can therefore fail a check. Projects whose CI runs `vp check` (or `vp fmt --check`) fail this way. `vp fmt` corrects those files first and adds them to the upgrade commit. Only genuine failures then remain in CI:
 
 ```bash
 vp fmt
 git add -A && git commit --amend --no-edit --no-verify
 ```
 
-`vp migrate` installs Vite+ git hooks, so the project's own pre-commit/pre-push checks run against the test commit and can block it for pre-existing lint or type errors unrelated to the upgrade. Use `--no-verify` on both `git commit` and `git push` for these test commits.
+`vp migrate` installs Vite+ git hooks. The project's own pre-commit and pre-push checks then run against the test commit. Those checks can block the commit because of lint or type errors that are already in the project. Use `--no-verify` on both `git commit` and `git push` for these test commits.
 
-**Keep the commit subject short.** The obvious subject, `test: upgrade vite-plus to prerelease 0.0.0-commit.<40-char sha>`, is over 70 characters and fails commitlint's default `header-max-length` (72) on every project that runs it, which is a self-inflicted red check on repos that would otherwise be green. Put the version in the body instead:
+**Keep the commit subject short.** The obvious subject is `test: upgrade vite-plus to prerelease 0.0.0-commit.<40-char sha>`. It is more than 70 characters, so it fails commitlint's default `header-max-length` of 72 on every project that runs commitlint. That red check comes from the test commit itself, not from the project. Put the version in the commit body instead:
 
 ```bash
 git commit --no-verify -m "test: upgrade vite-plus prerelease" \
@@ -178,7 +178,7 @@ git commit --no-verify -m "test: upgrade vite-plus prerelease" \
 
 ### 3. Draft PR on the fork, assigned to the release manager
 
-Open the PR **as a draft**, based on the tracked branch, under `vite-plus-ecosystem-ci`, and **assign it to the release manager**:
+Open the PR **as a draft**. Use the tracked branch as the base. Open it under `vite-plus-ecosystem-ci`. **Assign it to the release manager**:
 
 ```bash
 gh pr create --repo vite-plus-ecosystem-ci/$name --base "$branch" \
@@ -193,19 +193,23 @@ gh pr view <PR#> --repo vite-plus-ecosystem-ci/$name --json isCrossRepository --
 
 ### 4. Collect links and watch CI
 
-Once all PRs are open, list them in a table for review (project, PR link, base, prerelease, assignee, CI status), then check each PR's CI for **upgrade-related** failures:
+After all PRs are open, list them in a table for review. Give the project, the PR link, the base, the prerelease, the assignee, and the CI status. Then check the CI of each PR for failures that the **upgrade** caused:
 
 ```bash
 gh pr checks <PR#> --repo vite-plus-ecosystem-ci/$name
 ```
 
-Distinguish an upgrade failure (the prerelease does not resolve, build, or test, and the error references the prerelease version) from pre-existing or infra flakiness (missing DB service, network, unrelated lint). When a job fails at install, read its log: `gh api repos/vite-plus-ecosystem-ci/$name/actions/jobs/<job-id>/logs`.
+An upgrade failure has two marks: the prerelease does not resolve, build, or test, and the error text names the prerelease version. Other failures come from the project itself or from the infrastructure. Examples are a missing database service, a network error, or unrelated lint. Read the log when a job fails during install:
+
+```bash
+gh api repos/vite-plus-ecosystem-ci/$name/actions/jobs/<job-id>/logs
+```
 
 ## Filtering irrelevant fork-CI failures
 
-Across the full catalog most red checks say nothing about the release. Sort every failure into one of these before drawing a conclusion, and report the tally by cause rather than "N failed". Known per-repo cases are recorded in `notes` in `ecosystem.json`, so check there first.
+Across the full catalog, most red checks say nothing about the release. Put every failure into one of the classes below before you make a conclusion. Then report the count for each cause. Do not report only "N failed". `ecosystem.json` records the known per-repo cases in `notes`, so read those first.
 
-**1. Registry-bridge fetch flakes (re-runnable, and the most common false alarm).** The bridge occasionally drops tarball requests under load. pnpm reports `error (23). Will retry`, or the install fails with `ECONNRESET  aborted`. The dangerous variant is the platform binding: `@voidzero-dev/vite-plus-<platform>` is an **optional** dependency, so when its download exhausts pnpm's retries, pnpm skips it and still reports a successful install. The job then dies much later, at the first command that loads the binding:
+**1. Registry-bridge fetch flakes.** These are re-runnable, and they are the most common false alarm. The bridge sometimes drops tarball requests under load. pnpm then reports `error (23). Will retry`, or the install fails with `ECONNRESET  aborted`. The platform binding is the dangerous case, because `@voidzero-dev/vite-plus-<platform>` is an **optional** dependency. When its download uses all of pnpm's retries, pnpm skips the package and still reports a successful install. The job then fails much later, at the first command that loads the binding:
 
 ```
 Error: Cannot find native binding. npm has a bug related to optional dependencies
@@ -214,9 +218,9 @@ both package-lock.json and node_modules directory.
   cause: Cannot find module '@voidzero-dev/vite-plus-linux-x64-gnu'
 ```
 
-**Read this carefully: it is a local `node_modules` resolution failure, not a statement about the registry.** Node is reporting that the package is absent from this install; nothing here checked whether it was published. The "npm has a bug related to optional dependencies" sentence is boilerplate that NAPI's generated loader appends to every binding-load failure, and it steers readers toward a packaging or publishing explanation that is almost always wrong here. The bridge publishes every platform package for every commit build, and the packument URL will serve it fine while CI is failing this way.
+**Read this message carefully. It reports a local `node_modules` resolution failure. It says nothing about the registry.** Node reports only that the package is absent from this install. Nothing in this message checked the registry. NAPI's generated loader adds the sentence about the npm optional-dependency bug to every binding-load failure. That sentence points the reader to a packaging or publishing cause, which is almost always the wrong cause here. The bridge publishes every platform package for every commit build. The packument URL serves the package correctly while CI fails in this way.
 
-Confirm rather than assume:
+Confirm the state instead of an assumption:
 
 ```bash
 VERSION=0.0.0-commit.<sha>
@@ -224,19 +228,44 @@ curl -s "https://registry-bridge.viteplus.dev/@voidzero-dev%2fvite-plus-linux-x6
   | python3 -c "import json,sys; print('$VERSION' in json.load(sys.stdin)['versions'])"
 ```
 
-`True` means the package was published and the install dropped it, so the failure is a flake: re-run the job (`gh run rerun <run-id> --failed --repo vite-plus-ecosystem-ci/$name`). Only `False` would point at a publishing problem. Always grep the install step for `error (23)` and `ECONNRESET` before classifying this failure as anything else.
+`True` shows that the bridge published the package and that the install dropped it. The failure is then a flake, so re-run the job:
 
-**2. Preview-build artifacts.** Caused by the `0.0.0-commit.<sha>` version string itself, so they cannot happen for a real npm release: pnpm `ERR_PNPM_TRUST_DOWNGRADE` ("possible package takeover"), npm `ETARGET`/`notarget` and bun/pnpm minimum-release-age (`ERR_PNPM_NO_MATURE_MATCHING_VERSION`), `ERR_PNPM_TARBALL_URL_MISMATCH` or a failed supply-chain policy check against the bridge tarball URLs, `ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION` where a project declares `vite` as a peer, and Docker builds whose context does not carry the bridge `.npmrc`.
+```bash
+gh run rerun <run-id> --failed --repo vite-plus-ecosystem-ci/$name
+```
 
-**3. Fork infrastructure.** The fork is not the upstream repo and lacks its secrets and app installations. Recurring cases: `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`, `Failed to replace env in config: ${NODE_AUTH_TOKEN}`, `Password required` from a container-registry login, and third-party services such as CodSpeed returning `401 Unauthorized`. None of these are worth fixing per release; record them in `notes`. Most of them are on the "Checks that count as passing" list below, so a fork failing only these scores as a pass.
+Only `False` shows a publishing problem. Always search the install step for `error (23)` and `ECONNRESET` before you give this failure a different cause.
 
-**4. Project policy checks that a bot PR can never satisfy.** For example a `check-label` job requiring a `changelog:***` label, a commitlint rule that rejects the long `test: upgrade vite-plus to prerelease 0.0.0-commit.<sha>` subject, a `Validate branch name` job that rejects the dots in the required `update-vite-plus-prerelease-test-<version>` branch name (see "Smoke-test via a fork PR" for the per-project rename), or `knip`/`check-overrides` meta-checks that fail whenever dependencies change.
+**2. Preview-build artifacts.** The `0.0.0-commit.<sha>` version string itself causes these failures. They cannot occur for a real npm release. The recurring ones are:
 
-**5. Project-side breakage exposed by regenerating the lockfile.** The harness deletes the lockfile, so packages that only ever resolved a dependency through hoisting now fail once it is regenerated. The project never declared the dependency. Not a vite-plus problem. **Grep for both phrasings**, because the wording depends on the module system and it is easy to match only one: ESM reports `Cannot find package 'oxfmt' imported from ...`, CJS reports `Cannot find module 'esbuild'`. The importer is not always the project's own code: a third-party package can import a bare specifier that only resolved through hoisting before.
+- pnpm `ERR_PNPM_TRUST_DOWNGRADE` ("possible package takeover")
+- npm `ETARGET` or `notarget`
+- bun and pnpm minimum-release-age (`ERR_PNPM_NO_MATURE_MATCHING_VERSION`)
+- `ERR_PNPM_TARBALL_URL_MISMATCH`, or a failed supply-chain policy check against the bridge tarball URLs
+- `ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION`, when a project declares `vite` as a peer dependency
+- a Docker build whose context does not contain the bridge `.npmrc`
 
-**6. Stale pins.** A fork pinned several releases back (e.g. `0.1.x`) does not test the release under review: `vp migrate` performs a multi-release jump and any resulting type errors are evidence about that jump, not about the candidate. **When judging a release, weight the forks pinned to the immediately previous release most heavily**, and re-pin stale forks between releases.
+**3. Fork infrastructure.** The fork is not the upstream repo, so it does not have the secrets and app installations of the upstream. The recurring cases are:
 
-Only a failure that reproduces on the candidate but **not** on the previous release is a regression. Prove it with an isolated control rather than asserting it:
+- `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`
+- `Failed to replace env in config: ${NODE_AUTH_TOKEN}`
+- `Password required` from a container-registry login
+- a third-party service such as CodSpeed that returns `401 Unauthorized`
+
+Do not fix these for each release. Record them in `notes`. Most of them are in the "Checks that count as passing" list below, so a fork that fails only these checks scores as a pass.
+
+**4. Project policy checks that a bot PR can never satisfy.** For example:
+
+- a `check-label` job that requires a `changelog:***` label
+- a commitlint rule that rejects the long `test: upgrade vite-plus to prerelease 0.0.0-commit.<sha>` subject
+- a `Validate branch name` job that rejects the dots in the required `update-vite-plus-prerelease-test-<version>` branch name; "Smoke-test via a fork PR" gives the per-project rename
+- a `knip` or `check-overrides` meta-check that fails when dependencies change
+
+**5. Project-side breakage that a regenerated lockfile exposes.** The harness deletes the lockfile. A package that resolved a dependency only through hoisting then fails, because the project never declared that dependency. This is not a vite-plus problem. **Search for both phrasings**, because the wording depends on the module system and one pattern alone is easy to miss. ESM reports `Cannot find package 'oxfmt' imported from ...`. CJS reports `Cannot find module 'esbuild'`. The importer is not always the project's own code. A third-party package can also import a bare specifier that only hoisting resolved before.
+
+**6. Stale pins.** A fork pinned several releases back, for example to `0.1.x`, does not test the release under review. `vp migrate` then does a multi-release jump, and any type error is evidence about that jump instead of the candidate. **Give the most weight to the forks pinned to the immediately previous release.** Re-pin stale forks between releases.
+
+A failure is a regression only when it occurs on the candidate and does **not** occur on the previous release. Prove this with an isolated control. Do not assert it:
 
 ```bash
 VP_HOME=$HOME/.cache/vp-control-<prev> VP_VERSION=<prev> VP_NODE_MANAGER=no bash packages/cli/install.sh
@@ -244,15 +273,15 @@ cd <project> && VP_HOME=$HOME/.cache/vp-control-<prev> VP_NODE_MANAGER=no \
   PATH="$HOME/.cache/vp-control-<prev>/bin:$PATH" vp migrate <project> --no-interactive
 ```
 
-Run the control from **inside the project directory**. Running it from a vite-plus checkout makes `vp` resolve the local `packages/cli/dist` instead of the pinned release, which invalidates the comparison.
+Run the control from **inside the project directory**. If you run it from a vite-plus checkout, `vp` resolves the local `packages/cli/dist` and not the pinned release. That result is not a valid comparison.
 
 ## Making a fork's CI usable
 
-Two fixes belong on the **test branch only**, never on the tracked branch, which must differ from upstream only by what a release test needs.
+Apply the two fixes below to the **test branch only**. Never apply them to the tracked branch. The tracked branch must differ from upstream only by the changes that a release test needs.
 
 ### Forks with no PR CI
 
-If a fork's workflows never trigger on `pull_request`, the test PR reports "no checks" and proves nothing. Add a minimal build workflow to the test branch that exercises the pinned vite-plus, matching whatever setup the project already uses:
+Some forks have no workflow that a `pull_request` event triggers. The test PR then reports "no checks", and it proves nothing. Add a minimal build workflow to the test branch. That workflow must exercise the pinned vite-plus, and it must use the setup that the project already uses:
 
 ```yaml
 # .github/workflows/ecosystem-ci-build.yml
@@ -272,11 +301,11 @@ jobs:
       - run: vp run build
 ```
 
-Use `vp run build` so the job goes through the project's own `build` script. Record the repo in `notes`.
+Use `vp run build`, so that the job goes through the project's own `build` script. Record the repo in `notes`.
 
 ### Forks on third-party runners
 
-Self-hosted or third-party runner labels only resolve for the upstream org, so on a fork every job queues forever and the PR never reports a result. Map the labels to GitHub-hosted equivalents on the test branch:
+A self-hosted or third-party runner label resolves only for the upstream org. On a fork, every job then waits in the queue, and the PR never reports a result. Change the labels to the GitHub-hosted equivalents on the test branch:
 
 | Third-party label | GitHub-hosted |
 | --- | --- |
@@ -285,13 +314,13 @@ Self-hosted or third-party runner labels only resolve for the upstream org, so o
 | `blacksmith-32vcpu-windows-2025` | `windows-2025` |
 | `blacksmith-12vcpu-macos-15` | `macos-15` |
 
-Replace the longest label first (the `-arm` suffix before the plain label) so you do not leave a partially rewritten string. Runner-specific **actions** need more than a label swap and are usually not worth fixing: `useblacksmith/begin-testbox`, `useblacksmith/run-testbox`, and cache actions tied to the same provider. Leave those jobs failing and note them.
+Replace the longest label first. Replace the `-arm` label before the plain label, so that no partly rewritten string remains. Runner-specific **actions** need more work than a label change, and that work is usually not worth the cost. Examples are `useblacksmith/begin-testbox`, `useblacksmith/run-testbox`, and cache actions of the same provider. Leave those jobs in the failed state, and record them in `notes`.
 
 ## CI caveats
 
-- Some forks trigger CI on `push` only, not `pull_request` (flagged in `notes`, e.g. `codiff`, `delta-comic`). Opening a PR against them does not run their CI. If PR CI is required, add a `pull_request` trigger to the workflow's `on:` block **inside the ecosystem-ci PR**, not as a standalone commit on the tracked branch, so the fork stays clean against upstream.
-- Keep the tracked branch clean: do not land unrelated commits on it. It should differ from upstream only by what a release test needs.
-- **Non-standard installers do not resolve preview builds.** The preview-build smoke test needs the project's CI to resolve `vite-plus@0.0.0-commit.<sha>` through the registry bridge written into `.npmrc`. That works for npm/pnpm/yarn/bun; it fails for installers that ignore the `.npmrc` `registry=` or use their own. Known case: `cnpmcore`'s CI installs with `utoo` (`ut`, via `utooland/setup-utoo`), which resolves against public npm and 404s on the commit build (`No matching version found ... from N available versions`). Check a candidate's CI install step before trusting fork-CI results, and record known cases in `notes`.
+- A `push` event triggers the CI of some forks, and a `pull_request` event does not. `notes` flags these forks; `codiff` and `delta-comic` are examples. A PR against them does not run their CI. If you need PR CI, add a `pull_request` trigger to the `on:` block of the workflow **inside the ecosystem-ci PR**. Do not add it as a separate commit on the tracked branch. The fork then stays clean against upstream.
+- Keep the tracked branch clean. Do not commit unrelated changes to it. It must differ from upstream only by the changes that a release test needs.
+- **A non-standard installer does not resolve preview builds.** The preview-build smoke test needs the project's CI to resolve `vite-plus@0.0.0-commit.<sha>` through the registry bridge in `.npmrc`. This works for npm, pnpm, yarn, and bun. It fails for an installer that ignores the `registry=` line in `.npmrc` or that uses its own registry. `cnpmcore` is the known case: its CI installs with `utoo` (`ut`, through `utooland/setup-utoo`), which resolves against public npm and returns a 404 for the commit build (`No matching version found ... from N available versions`). Check the CI install step of a candidate repo before you trust its fork-CI result. Record each known case in `notes`.
 
 ## Maintaining the catalog
 
@@ -309,48 +338,52 @@ scripts/enable-actions.sh "$name"
 # 3. add an entry to ecosystem.json (name, upstream, branch, packageManager, monorepo, notes)
 ```
 
-Set `packageManager` from the `packageManager` field in `package.json` when present; only when it is absent, infer from the committed lockfile (`pnpm-lock.yaml` -> pnpm, `bun.lock*` -> bun, `yarn.lock` -> yarn, `package-lock.json` -> npm, package.json only -> node, none -> other). Lockfile presence alone is unreliable: some repos gitignore their lockfile entirely (e.g. `cnpmcore` commits no lockfile and declares `npm`). Also check **how the project's CI installs**, since a non-standard installer can break the preview-build smoke test: `cnpmcore`'s CI installs with `utoo` (`ut`), which does not resolve `vite-plus@0.0.0-commit.<sha>` through the bridge `.npmrc`, so its smoke test fails at dependency resolution (record this in `notes`). Set `monorepo` if a `workspaces` field, `pnpm-workspace.yaml`, or a `packages/` dir is present.
+Set the fields as follows.
+
+- **`packageManager`.** Use the `packageManager` field of `package.json` when the project has one. Only when that field is absent, derive the value from the committed lockfile: `pnpm-lock.yaml` gives pnpm, `bun.lock*` gives bun, `yarn.lock` gives yarn, `package-lock.json` gives npm, a `package.json` alone gives node, and no such file gives other. The lockfile alone is not reliable, because some repos ignore their lockfile in `.gitignore`. For example, `cnpmcore` commits no lockfile and declares `npm`.
+- **The CI install step.** Check how the project's CI installs dependencies, because a non-standard installer breaks the preview-build smoke test. `cnpmcore`'s CI installs with `utoo` (`ut`), which does not resolve `vite-plus@0.0.0-commit.<sha>` through the bridge `.npmrc`. Its smoke test therefore fails during dependency resolution. Record this in `notes`.
+- **`monorepo`.** Set this field when the project has a `workspaces` field, a `pnpm-workspace.yaml` file, or a `packages/` directory.
 
 ### Remove a repo
 
-Delete its entry from `ecosystem.json`. Optionally delete the fork (`gh repo delete vite-plus-ecosystem-ci/<name>`); keeping it is harmless but the manifest is what tooling reads. Add a line to "Excluded repos" below so the next person does not re-add it and repeat the work.
+Delete the entry of the repo from `ecosystem.json`. You can also delete the fork with `gh repo delete vite-plus-ecosystem-ci/<name>`, but the fork does no harm, and tooling reads only the manifest. Add a line to "Excluded repos" below. The next person then does not add the repo again and repeat the work.
 
 ### Excluded repos
 
-Deliberately out of the catalog. Do not re-add without fixing the underlying reason.
+These repos are deliberately out of the catalog. Do not add one again before you correct the cause.
 
 | Repo | Why |
 | --- | --- |
-| `vize` (`ubugeeei/vize`) | Its CI cannot produce a usable release signal. Every workflow targets Blacksmith runners that do not resolve on a fork, so jobs queue forever until the labels are rewritten; `e2e.yml` also uses `useblacksmith/*` actions that a label swap cannot fix. The remaining `app-readiness` E2E matrix stays red, and upstream moves fast enough (80+ commits in a day) that a fork synced at the start of a release is stale by the time the PR runs. The cost of keeping it green exceeds its value as a signal. |
-| `cnpmcore` (`cnpm/cnpmcore`) | Its CI installs with `utoo` (`ut`, via `utooland/setup-utoo`), which ignores the bridge `registry=` in `.npmrc` and resolves against public npm, so a `0.0.0-commit.<sha>` build 404s. Every job then fails (135 test files red) for a reason that can never occur with a real npm release. Nothing about the fork's CI is informative for a preview-build smoke test. |
-| `mlx-node` (`huggingface/mlx-node`) | Both failing jobs are Rust (`cargo test`, `-p mlx-core --test kquant_ggml_parity`) and do not exercise vite-plus. The JS surface is too small to justify the triage cost. |
-| `tech-interview-handbook` (`yangshun/tech-interview-handbook`) | A Docusaurus site whose build fails on a webpack `ProgressPlugin ... does not match the API schema` error unrelated to vite-plus, with no passing checks to offset it. |
+| `vize` (`ubugeeei/vize`) | Its CI cannot give a usable release signal. Every workflow targets Blacksmith runners that do not resolve on a fork, so every job waits in the queue until you rewrite the labels. `e2e.yml` also uses `useblacksmith/*` actions, which a label change cannot fix. The `app-readiness` E2E matrix then stays in the failed state. Upstream also moves fast, more than 80 commits in a day, so a fork synced at the start of a release is stale when the PR runs. The cost to keep this fork green is more than the value of its signal. |
+| `cnpmcore` (`cnpm/cnpmcore`) | Its CI installs with `utoo` (`ut`, through `utooland/setup-utoo`). `utoo` ignores the bridge `registry=` line in `.npmrc` and resolves against public npm, so a `0.0.0-commit.<sha>` build returns a 404. Every job then fails, and 135 test files fail, for a cause that cannot occur with a real npm release. Its fork CI gives no information for a preview-build smoke test. |
+| `mlx-node` (`huggingface/mlx-node`) | Both failing jobs are Rust jobs (`cargo test`, `-p mlx-core --test kquant_ggml_parity`), and they do not exercise vite-plus. Its JS surface is too small for the triage cost. |
+| `tech-interview-handbook` (`yangshun/tech-interview-handbook`) | This Docusaurus site fails its build with a webpack error, `ProgressPlugin ... does not match the API schema`, which is unrelated to vite-plus. It has no passing check to balance that failure. |
 
 ### Checks that count as passing
 
-These four classes of failing check **count as passing** when scoring a fork. They fail for reasons that exist only because the PR is a bot PR on a fork, and none of them can tell you anything about the vite-plus release. A fork whose only red checks are in this list is a **pass**, not a partial failure. Do not re-triage them each release; per-repo cases are recorded in `notes`.
+The four classes of failing check below **count as passing** when you score a fork. Each one fails only because the PR is a bot PR on a fork. None of them gives information about the vite-plus release. A fork whose red checks are all in this list is a **pass**, not a partial failure. Do not triage them again for each release. `notes` records the per-repo cases.
 
 | Class | How it presents | Why it never means anything |
 | --- | --- | --- |
-| `pkg-pr-new` publish jobs | `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`. Often inside a job named `build`, not one named after the app. | The App is deliberately not installed on this org. |
-| commitlint / commit-message checks | `header-max-length`, `subject may not be longer than ...` | Triggered by the test commit's own subject, not by the project's code. Keep the subject short (see "Apply the upgrade"), and treat any remaining hit as passing. |
-| Third-party benchmark and coverage uploads | CodSpeed and similar failing with `401 Unauthorized`, or an installer hash-pin mismatch | The fork has no token for the service. |
-| Docker image build/push jobs | `Password required`, `buildx failed`, or `ERR_PNPM_TARBALL_URL_MISMATCH` inside an image build | The fork has no registry credentials, and a Docker build context does not carry the bridge `.npmrc`, so a preview build cannot resolve inside the image. |
+| `pkg-pr-new` publish jobs | `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`. Often inside a job named `build`, not a job named after the app. | This org deliberately does not install the App. |
+| commitlint / commit-message checks | `header-max-length`, `subject may not be longer than ...` | The test commit's own subject causes it, not the project's code. Keep the subject short (see "Apply the upgrade"), and count any remaining hit as a pass. |
+| Third-party benchmark and coverage uploads | CodSpeed and similar services that fail with `401 Unauthorized`, or an installer hash-pin mismatch | The fork has no token for the service. |
+| Docker image build/push jobs | `Password required`, `buildx failed`, or `ERR_PNPM_TARBALL_URL_MISMATCH` inside an image build | The fork has no registry credentials. A Docker build context also does not contain the bridge `.npmrc`, so a preview build cannot resolve inside the image. |
 
-Everything else still needs triage. In particular these are **not** in the list and must be read: PR-label gates, branch-name policy jobs, `knip`/`check-overrides` meta-checks, and jobs that need a plain repository token (`Input required and not supplied: token`). They are usually noise too, but they are project-specific and worth a glance.
+Every other check still needs triage. These four are deliberately **not** in the list, and you must read them: PR-label gates, branch-name policy jobs, `knip` and `check-overrides` meta-checks, and jobs that need a plain repository token (`Input required and not supplied: token`). They are usually noise, but each one is specific to its project, so read it.
 
 ### Classify by the most specific cause, not the first pattern that matches
 
-Match real causes **before** generic infra and policy patterns. A job log routinely mentions `commitlint` or `knip` in a step name while failing for an entirely different reason, so a filter that tests for policy first will silently misfile real findings as noise. Ordering that works, most specific first:
+Match real causes **before** generic infrastructure and policy patterns. A job log often names `commitlint` or `knip` in a step while the job fails for a different reason. A filter that tests the policy patterns first therefore files real findings as noise, and it gives no warning. Use this order, most specific first:
 
 1. `Lint or type issues found` (newer oxlint), `linter rules JSON is out of date` (oxlint ruleset drift)
-2. `Cannot find package '<x>'` / `Cannot find module '<x>'` (undeclared dependency, or a third-party package importing a bare specifier)
+2. `Cannot find package '<x>'` or `Cannot find module '<x>'` (undeclared dependency, or a third-party package that imports a bare specifier)
 3. `error TS...` (project type errors)
-4. test-runner and browser failures (`page.waitForSelector: Timeout`, missing spy matchers under Deno)
-5. `Cannot find native binding`, `error (23). Will retry`, `ECONNRESET` (bridge flake, re-run)
-6. only then the counts-as-passing classes above, then policy gates, then `The operation was canceled` (fail-fast collateral)
+4. test-runner and browser failures (`page.waitForSelector: Timeout`, absent spy matchers under Deno)
+5. `Cannot find native binding`, `error (23). Will retry`, `ECONNRESET` (bridge flake, re-run the job)
+6. then the counts-as-passing classes above, then policy gates, then `The operation was canceled` (fail-fast collateral)
 
-Verify a classification against the failing job's own log rather than the repo's first failing job: a repo with several red checks usually has several different causes, and reading only the first one attributes all of them to whatever that one happened to be.
+Check each classification against the log of that failing job. Do not use the log of the repo's first failing job. A repo with several red checks usually has several different causes. If you read only the first log, you give every failure the cause of that one job.
 
 ### Drift check (manifest vs actual org repos)
 
@@ -364,8 +397,8 @@ comm -3 \
 
 ## How vite-plus references this
 
-The `release-manager` skill's smoke-test step should link here instead of embedding the catalog or the setup steps:
+The smoke-test step of the `release-manager` skill links here. It does not contain the catalog or the setup steps:
 
 > Smoke-test targets and local setup: https://github.com/vite-plus-ecosystem-ci/.github/blob/main/TESTING.md . Pick a target from `ecosystem.json`, clone on its tracked branch (`scripts/setup-local.sh <name>`), then run `test-pkg-pr-new-migrate.sh`. To validate in the fork's CI, follow "Smoke-test via a fork PR": branch `update-vite-plus-prerelease-test-<version>` synced from `source`, open a draft PR on the fork assigned to the release manager, then watch CI. Any test PR must be opened against the `vite-plus-ecosystem-ci` fork, never the upstream repo.
 
-That keeps the churn (which repos exist, which branch each tracks) here, and keeps the release process in vite-plus.
+This split keeps the changes that happen often, such as which repos exist and which branch each one tracks, in this document. It keeps the release process in vite-plus.
