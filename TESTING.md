@@ -192,6 +192,87 @@ gh pr checks <PR#> --repo vite-plus-ecosystem-ci/$name
 
 Distinguish an upgrade failure (the prerelease does not resolve, build, or test, and the error references the prerelease version) from pre-existing or infra flakiness (missing DB service, network, unrelated lint). When a job fails at install, read its log: `gh api repos/vite-plus-ecosystem-ci/$name/actions/jobs/<job-id>/logs`.
 
+## Filtering irrelevant fork-CI failures
+
+Across the full catalog most red checks say nothing about the release. Sort every failure into one of these before drawing a conclusion, and report the tally by cause rather than "N failed". Known per-repo cases are recorded in `notes` in `ecosystem.json`, so check there first.
+
+**1. Registry-bridge fetch flakes (re-runnable, and the most common false alarm).** The bridge occasionally drops tarball requests under load. pnpm reports `error (23). Will retry`, or the install fails with `ECONNRESET  aborted`. The dangerous variant is the platform binding: `@voidzero-dev/vite-plus-<platform>` is an **optional** dependency, so when its download exhausts pnpm's retries the install still reports success, and the job dies later with a misleading
+
+```
+Error: Cannot find native binding.
+  cause: Cannot find module '@voidzero-dev/vite-plus-linux-x64-gnu'
+```
+
+That message looks like the native addon was never published. Verify before believing it:
+
+```bash
+curl -s "https://registry-bridge.viteplus.dev/@voidzero-dev%2fvite-plus-linux-x64-gnu" \
+  | python3 -c "import json,sys; print('$VERSION' in json.load(sys.stdin)['versions'])"
+```
+
+If the version is present, it was a flake. Re-run the job (`gh run rerun <run-id> --failed --repo vite-plus-ecosystem-ci/$name`) before classifying it. Always grep the install step for `error (23)` and `ECONNRESET` first.
+
+**2. Preview-build artifacts.** Caused by the `0.0.0-commit.<sha>` version string itself, so they cannot happen for a real npm release: pnpm `ERR_PNPM_TRUST_DOWNGRADE` ("possible package takeover"), npm `ETARGET`/`notarget` and bun/pnpm minimum-release-age (`ERR_PNPM_NO_MATURE_MATCHING_VERSION`), `ERR_PNPM_TARBALL_URL_MISMATCH` or a failed supply-chain policy check against the bridge tarball URLs, `ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION` where a project declares `vite` as a peer, and Docker builds whose context does not carry the bridge `.npmrc`.
+
+**3. Fork infrastructure.** The fork is not the upstream repo and lacks its secrets and app installations. Recurring cases: `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`, `Failed to replace env in config: ${NODE_AUTH_TOKEN}`, `Password required` from a container-registry login, and third-party services such as CodSpeed returning `401 Unauthorized`. None of these are worth fixing per release; record them in `notes`.
+
+**4. Project policy checks that a bot PR can never satisfy.** For example a `check-label` job requiring a `changelog:***` label, a commitlint rule that rejects the long `test: upgrade vite-plus to prerelease 0.0.0-commit.<sha>` subject, or `knip`/`check-overrides` meta-checks that fail whenever dependencies change.
+
+**5. Project-side breakage exposed by regenerating the lockfile.** The harness deletes the lockfile, so packages that only ever resolved a dependency through hoisting now fail with `Cannot find package 'oxfmt'` or `Cannot find package 'esbuild'`. The project never declared it. Not a vite-plus problem.
+
+**6. Stale pins.** A fork pinned several releases back (e.g. `0.1.x`) does not test the release under review: `vp migrate` performs a multi-release jump and any resulting type errors are evidence about that jump, not about the candidate. **When judging a release, weight the forks pinned to the immediately previous release most heavily**, and re-pin stale forks between releases.
+
+Only a failure that reproduces on the candidate but **not** on the previous release is a regression. Prove it with an isolated control rather than asserting it:
+
+```bash
+VP_HOME=$HOME/.cache/vp-control-<prev> VP_VERSION=<prev> VP_NODE_MANAGER=no bash packages/cli/install.sh
+cd <project> && VP_HOME=$HOME/.cache/vp-control-<prev> VP_NODE_MANAGER=no \
+  PATH="$HOME/.cache/vp-control-<prev>/bin:$PATH" vp migrate <project> --no-interactive
+```
+
+Run the control from **inside the project directory**. Running it from a vite-plus checkout makes `vp` resolve the local `packages/cli/dist` instead of the pinned release, which invalidates the comparison.
+
+## Making a fork's CI usable
+
+Two fixes belong on the **test branch only**, never on the tracked branch, which must differ from upstream only by what a release test needs.
+
+### Forks with no PR CI
+
+If a fork's workflows never trigger on `pull_request`, the test PR reports "no checks" and proves nothing. Add a minimal build workflow to the test branch that exercises the pinned vite-plus, matching whatever setup the project already uses:
+
+```yaml
+# .github/workflows/ecosystem-ci-build.yml
+name: ecosystem-ci build
+on:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: '24'
+          cache: false
+          run-install: true
+      - run: vp run build
+```
+
+Use `vp run build` so the job goes through the project's own `build` script. Record the repo in `notes`.
+
+### Forks on third-party runners
+
+Self-hosted or third-party runner labels only resolve for the upstream org, so on a fork every job queues forever and the PR never reports a result. Map the labels to GitHub-hosted equivalents on the test branch:
+
+| Third-party label | GitHub-hosted |
+| --- | --- |
+| `blacksmith-32vcpu-ubuntu-2404` | `ubuntu-24.04` |
+| `blacksmith-32vcpu-ubuntu-2404-arm` | `ubuntu-24.04-arm` |
+| `blacksmith-32vcpu-windows-2025` | `windows-2025` |
+| `blacksmith-12vcpu-macos-15` | `macos-15` |
+
+Replace the longest label first (the `-arm` suffix before the plain label) so you do not leave a partially rewritten string. Runner-specific **actions** need more than a label swap and are usually not worth fixing: `useblacksmith/begin-testbox`, `useblacksmith/run-testbox`, and cache actions tied to the same provider. Leave those jobs failing and note them.
+
 ## CI caveats
 
 - Some forks trigger CI on `push` only, not `pull_request` (flagged in `notes`, e.g. `codiff`, `delta-comic`). Opening a PR against them does not run their CI. If PR CI is required, add a `pull_request` trigger to the workflow's `on:` block **inside the ecosystem-ci PR**, not as a standalone commit on the tracked branch, so the fork stays clean against upstream.
