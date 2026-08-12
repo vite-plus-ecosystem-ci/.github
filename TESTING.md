@@ -143,6 +143,8 @@ git push --no-verify origin "source/$branch:refs/heads/$branch"
 
 If PRs were already opened against a stale base, GitHub does not recompute their merge base when the base branch moves. Close and reopen each PR to force it (a reopened draft stays a draft).
 
+**Re-check the divergence immediately before opening each PR, not only at the start of the run.** A full-catalog sweep takes hours, and an active upstream can move 80+ commits in that window, so a fork synced at the beginning is stale by the time its PR runs. A PR on a stale base differs from the release under test in two ways at once, which makes any failure unattributable.
+
 Branch name convention (required): **`update-vite-plus-prerelease-test-{version}`**, where `{version}` is the vite-plus prerelease under test (a preview build `0.0.0-commit.<sha>`, or a tagged prerelease like `0.2.3-alpha.1`).
 
 Some projects enforce their own branch-name policy in CI and will reject that name. When a `Validate branch name`-style check fails, read the pattern out of the job log and rename the branch to satisfy it for that project only; the convention above still applies everywhere else. A conventional-commit pattern such as `^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)/[a-z0-9]+(-[a-z0-9]+)*$` rejects the dots in `0.0.0-commit.<sha>`, so drop the dotted version and keep the bare sha:
@@ -166,6 +168,13 @@ git add -A && git commit --amend --no-edit --no-verify
 ```
 
 `vp migrate` installs Vite+ git hooks, so the project's own pre-commit/pre-push checks run against the test commit and can block it for pre-existing lint or type errors unrelated to the upgrade. Use `--no-verify` on both `git commit` and `git push` for these test commits.
+
+**Keep the commit subject short.** The obvious subject, `test: upgrade vite-plus to prerelease 0.0.0-commit.<40-char sha>`, is over 70 characters and fails commitlint's default `header-max-length` (72) on every project that runs it, which is a self-inflicted red check on repos that would otherwise be green. Put the version in the body instead:
+
+```bash
+git commit --no-verify -m "test: upgrade vite-plus prerelease" \
+  -m "vite-plus 0.0.0-commit.<sha>, via the ecosystem-ci smoke test."
+```
 
 ### 3. Draft PR on the fork, assigned to the release manager
 
@@ -313,6 +322,17 @@ Deliberately out of the catalog. Do not re-add without fixing the underlying rea
 | Repo | Why |
 | --- | --- |
 | `vize` (`ubugeeei/vize`) | Its CI cannot produce a usable release signal. Every workflow targets Blacksmith runners that do not resolve on a fork, so jobs queue forever until the labels are rewritten; `e2e.yml` also uses `useblacksmith/*` actions that a label swap cannot fix. The remaining `app-readiness` E2E matrix stays red, and upstream moves fast enough (80+ commits in a day) that a fork synced at the start of a release is stale by the time the PR runs. The cost of keeping it green exceeds its value as a signal. |
+| `cnpmcore` (`cnpm/cnpmcore`) | Its CI installs with `utoo` (`ut`, via `utooland/setup-utoo`), which ignores the bridge `registry=` in `.npmrc` and resolves against public npm, so a `0.0.0-commit.<sha>` build 404s. Every job then fails (135 test files red) for a reason that can never occur with a real npm release. Nothing about the fork's CI is informative for a preview-build smoke test. |
+| `mlx-node` (`huggingface/mlx-node`) | Both failing jobs are Rust (`cargo test`, `-p mlx-core --test kquant_ggml_parity`) and do not exercise vite-plus. The JS surface is too small to justify the triage cost. |
+| `tech-interview-handbook` (`yangshun/tech-interview-handbook`) | A Docusaurus site whose build fails on a webpack `ProgressPlugin ... does not match the API schema` error unrelated to vite-plus, with no passing checks to offset it. |
+
+### Ignorable checks on repos we keep
+
+Some forks stay in the catalog because part of their CI is genuinely useful, even though specific jobs can never pass on a fork. Do not re-triage these each release; they are recorded in `notes`.
+
+- **`pkg-pr-new` publish jobs.** The `pkg-pr-new` GitHub App is deliberately not installed on this org, so any job that calls it fails with `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`. Affects several forks, sometimes inside a job named `build`. Ignore it and judge the repo on its other checks.
+- **Docker image build/push jobs** that need registry credentials the fork does not have (`Password required`), and jobs that need a repository token (`Input required and not supplied: token`).
+- **Benchmark and coverage uploads** to third-party services (for example CodSpeed), which fail with `401 Unauthorized` on a fork.
 
 ### Drift check (manifest vs actual org repos)
 

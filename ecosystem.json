@@ -43,14 +43,6 @@
       "notes": "fork-CI noise: the `Test on Deno` job fails on `expect(...).toHaveBeenCalledTimes is not a function`, a Deno test-environment issue independent of the vite-plus version."
     },
     {
-      "name": "cnpmcore",
-      "upstream": "cnpm/cnpmcore",
-      "branch": "master",
-      "packageManager": "npm",
-      "monorepo": false,
-      "notes": "backend (egg.js) using vite-plus + vitest; commits NO lockfile (package-lock/pnpm-lock gitignored); packageManager field says npm but CI installs via utoo (ut, utooland/setup-utoo), which does NOT resolve vite-plus preview builds through the bridge .npmrc, so preview-build smoke tests fail at dependency resolution"
-    },
-    {
       "name": "codiff",
       "upstream": "nkzw-tech/codiff",
       "branch": "main",
@@ -104,7 +96,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise: the Docker build/push jobs need registry credentials the fork does not have and fail with `Password required`. Unrelated to vite-plus."
+      "notes": "fork-CI noise is limited to jobs the fork cannot run: the `build (*)` Docker image jobs need registry credentials (`Password required`) and `format` needs a token (`Input required and not supplied: token`). The `test` job is the real signal and does pass; if it fails with `Cannot find native binding`, that is the bridge flake, so re-run it."
     },
     {
       "name": "dotabod-frontend",
@@ -217,14 +209,6 @@
       "packageManager": "pnpm",
       "monorepo": true,
       "notes": "project-side: a package imports `esbuild` without declaring it and only resolves it through hoisting, so it fails with `Cannot find package 'esbuild'` whenever the lockfile is regenerated. Unrelated to vite-plus."
-    },
-    {
-      "name": "mlx-node",
-      "upstream": "mlx-node/mlx-node",
-      "branch": "main",
-      "packageManager": "yarn",
-      "monorepo": true,
-      "notes": "fork-CI noise: the failing job is a Rust test suite (`-p mlx-core --test kquant_ggml_parity`) that does not involve vite-plus."
     },
     {
       "name": "museeks",
@@ -369,14 +353,6 @@
       "packageManager": "node",
       "monorepo": false,
       "notes": "blocked: same `@janosh/vite-config` problem as matterviz. The package has no entry point, so `vite.config.ts` cannot load and no checks run."
-    },
-    {
-      "name": "tech-interview-handbook",
-      "upstream": "yangshun/tech-interview-handbook",
-      "branch": "main",
-      "packageManager": "pnpm",
-      "monorepo": true,
-      "notes": ""
     },
     {
       "name": "trpc-nuxt",
