@@ -451,14 +451,6 @@
       "notes": ""
     },
     {
-      "name": "vize",
-      "upstream": "ubugeeei/vize",
-      "branch": "main",
-      "packageManager": "pnpm",
-      "monorepo": true,
-      "notes": "all workflows target Blacksmith runners (`blacksmith-32vcpu-ubuntu-2404` and friends) that do not resolve for this fork, so every job queues forever. Swap the runner labels for GitHub-hosted equivalents on the test branch; see \"Forks on third-party runners\" in TESTING.md. `e2e.yml` additionally uses `useblacksmith/begin-testbox` and `useblacksmith/run-testbox`, which need more than a label swap."
-    },
-    {
       "name": "vue-clamp",
       "upstream": "Justineo/vue-clamp",
       "branch": "main",

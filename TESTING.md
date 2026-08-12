@@ -304,7 +304,15 @@ Set `packageManager` from the `packageManager` field in `package.json` when pres
 
 ### Remove a repo
 
-Delete its entry from `ecosystem.json`. Optionally delete the fork (`gh repo delete vite-plus-ecosystem-ci/<name>`); keeping it is harmless but the manifest is what tooling reads.
+Delete its entry from `ecosystem.json`. Optionally delete the fork (`gh repo delete vite-plus-ecosystem-ci/<name>`); keeping it is harmless but the manifest is what tooling reads. Add a line to "Excluded repos" below so the next person does not re-add it and repeat the work.
+
+### Excluded repos
+
+Deliberately out of the catalog. Do not re-add without fixing the underlying reason.
+
+| Repo | Why |
+| --- | --- |
+| `vize` (`ubugeeei/vize`) | Its CI cannot produce a usable release signal. Every workflow targets Blacksmith runners that do not resolve on a fork, so jobs queue forever until the labels are rewritten; `e2e.yml` also uses `useblacksmith/*` actions that a label swap cannot fix. The remaining `app-readiness` E2E matrix stays red, and upstream moves fast enough (80+ commits in a day) that a fork synced at the start of a release is stale by the time the PR runs. The cost of keeping it green exceeds its value as a signal. |
 
 ### Drift check (manifest vs actual org repos)
 
