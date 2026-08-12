@@ -228,7 +228,7 @@ curl -s "https://registry-bridge.viteplus.dev/@voidzero-dev%2fvite-plus-linux-x6
 
 **2. Preview-build artifacts.** Caused by the `0.0.0-commit.<sha>` version string itself, so they cannot happen for a real npm release: pnpm `ERR_PNPM_TRUST_DOWNGRADE` ("possible package takeover"), npm `ETARGET`/`notarget` and bun/pnpm minimum-release-age (`ERR_PNPM_NO_MATURE_MATCHING_VERSION`), `ERR_PNPM_TARBALL_URL_MISMATCH` or a failed supply-chain policy check against the bridge tarball URLs, `ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION` where a project declares `vite` as a peer, and Docker builds whose context does not carry the bridge `.npmrc`.
 
-**3. Fork infrastructure.** The fork is not the upstream repo and lacks its secrets and app installations. Recurring cases: `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`, `Failed to replace env in config: ${NODE_AUTH_TOKEN}`, `Password required` from a container-registry login, and third-party services such as CodSpeed returning `401 Unauthorized`. None of these are worth fixing per release; record them in `notes`.
+**3. Fork infrastructure.** The fork is not the upstream repo and lacks its secrets and app installations. Recurring cases: `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`, `Failed to replace env in config: ${NODE_AUTH_TOKEN}`, `Password required` from a container-registry login, and third-party services such as CodSpeed returning `401 Unauthorized`. None of these are worth fixing per release; record them in `notes`. Most of them are on the "Checks that count as passing" list below, so a fork failing only these scores as a pass.
 
 **4. Project policy checks that a bot PR can never satisfy.** For example a `check-label` job requiring a `changelog:***` label, a commitlint rule that rejects the long `test: upgrade vite-plus to prerelease 0.0.0-commit.<sha>` subject, a `Validate branch name` job that rejects the dots in the required `update-vite-plus-prerelease-test-<version>` branch name (see "Smoke-test via a fork PR" for the per-project rename), or `knip`/`check-overrides` meta-checks that fail whenever dependencies change.
 
@@ -326,13 +326,31 @@ Deliberately out of the catalog. Do not re-add without fixing the underlying rea
 | `mlx-node` (`huggingface/mlx-node`) | Both failing jobs are Rust (`cargo test`, `-p mlx-core --test kquant_ggml_parity`) and do not exercise vite-plus. The JS surface is too small to justify the triage cost. |
 | `tech-interview-handbook` (`yangshun/tech-interview-handbook`) | A Docusaurus site whose build fails on a webpack `ProgressPlugin ... does not match the API schema` error unrelated to vite-plus, with no passing checks to offset it. |
 
-### Ignorable checks on repos we keep
+### Checks that count as passing
 
-Some forks stay in the catalog because part of their CI is genuinely useful, even though specific jobs can never pass on a fork. Do not re-triage these each release; they are recorded in `notes`.
+These four classes of failing check **count as passing** when scoring a fork. They fail for reasons that exist only because the PR is a bot PR on a fork, and none of them can tell you anything about the vite-plus release. A fork whose only red checks are in this list is a **pass**, not a partial failure. Do not re-triage them each release; per-repo cases are recorded in `notes`.
 
-- **`pkg-pr-new` publish jobs.** The `pkg-pr-new` GitHub App is deliberately not installed on this org, so any job that calls it fails with `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`. Affects several forks, sometimes inside a job named `build`. Ignore it and judge the repo on its other checks.
-- **Docker image build/push jobs** that need registry credentials the fork does not have (`Password required`), and jobs that need a repository token (`Input required and not supplied: token`).
-- **Benchmark and coverage uploads** to third-party services (for example CodSpeed), which fail with `401 Unauthorized` on a fork.
+| Class | How it presents | Why it never means anything |
+| --- | --- | --- |
+| `pkg-pr-new` publish jobs | `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`. Often inside a job named `build`, not one named after the app. | The App is deliberately not installed on this org. |
+| commitlint / commit-message checks | `header-max-length`, `subject may not be longer than ...` | Triggered by the test commit's own subject, not by the project's code. Keep the subject short (see "Apply the upgrade"), and treat any remaining hit as passing. |
+| Third-party benchmark and coverage uploads | CodSpeed and similar failing with `401 Unauthorized`, or an installer hash-pin mismatch | The fork has no token for the service. |
+| Docker image build/push jobs | `Password required`, `buildx failed`, or `ERR_PNPM_TARBALL_URL_MISMATCH` inside an image build | The fork has no registry credentials, and a Docker build context does not carry the bridge `.npmrc`, so a preview build cannot resolve inside the image. |
+
+Everything else still needs triage. In particular these are **not** in the list and must be read: PR-label gates, branch-name policy jobs, `knip`/`check-overrides` meta-checks, and jobs that need a plain repository token (`Input required and not supplied: token`). They are usually noise too, but they are project-specific and worth a glance.
+
+### Classify by the most specific cause, not the first pattern that matches
+
+Match real causes **before** generic infra and policy patterns. A job log routinely mentions `commitlint` or `knip` in a step name while failing for an entirely different reason, so a filter that tests for policy first will silently misfile real findings as noise. Ordering that works, most specific first:
+
+1. `Lint or type issues found` (newer oxlint), `linter rules JSON is out of date` (oxlint ruleset drift)
+2. `Cannot find package '<x>'` / `Cannot find module '<x>'` (undeclared dependency, or a third-party package importing a bare specifier)
+3. `error TS...` (project type errors)
+4. test-runner and browser failures (`page.waitForSelector: Timeout`, missing spy matchers under Deno)
+5. `Cannot find native binding`, `error (23). Will retry`, `ECONNRESET` (bridge flake, re-run)
+6. only then the counts-as-passing classes above, then policy gates, then `The operation was canceled` (fail-fast collateral)
+
+Verify a classification against the failing job's own log rather than the repo's first failing job: a repo with several red checks usually has several different causes, and reading only the first one attributes all of them to whatever that one happened to be.
 
 ### Drift check (manifest vs actual org repos)
 
