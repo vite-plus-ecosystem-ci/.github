@@ -1,0 +1,19 @@
+ecosystem.json
+  s_fdbdae8c09ca7c::t_059baef80090ae 35,43,107,123,155,187,195,203,211,219,227,275,331,371,403,411,459,467
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "cc4b533ba37cb2b7830dfa66ef81a22280382772",
+  "prompts": {},
+  "sessions": {
+    "s_fdbdae8c09ca7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1202c2a1-3a3c-4672-9642-5e437556b1a7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "MK <fengmk2@gmail.com>"
+    }
+  }
+}
