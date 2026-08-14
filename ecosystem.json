@@ -32,7 +32,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork, so its check fails with `Check failed (404): The app https://github.com/apps/pkg-pr-new is not installed`. Unrelated to vite-plus."
     },
     {
       "name": "brazilian-utils-javascript",
@@ -40,15 +40,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": false,
-      "notes": ""
-    },
-    {
-      "name": "cnpmcore",
-      "upstream": "cnpm/cnpmcore",
-      "branch": "master",
-      "packageManager": "npm",
-      "monorepo": false,
-      "notes": "backend (egg.js) using vite-plus + vitest; commits NO lockfile (package-lock/pnpm-lock gitignored); packageManager field says npm but CI installs via utoo (ut, utooland/setup-utoo), which does NOT resolve vite-plus preview builds through the bridge .npmrc, so preview-build smoke tests fail at dependency resolution"
+      "notes": "fork-CI noise: the `Test on Deno` job fails on `expect(...).toHaveBeenCalledTimes is not a function`, a Deno test-environment issue independent of the vite-plus version."
     },
     {
       "name": "codiff",
@@ -104,7 +96,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "fork-CI noise is limited to jobs the fork cannot run: the `build (*)` Docker image jobs need registry credentials (`Password required`) and `format` needs a token (`Input required and not supplied: token`). The `test` job is the real signal and does pass; if it fails with `Cannot find native binding`, that is the bridge flake, so re-run it."
     },
     {
       "name": "dotabod-frontend",
@@ -120,7 +112,7 @@
       "branch": "main",
       "packageManager": "bun",
       "monorepo": false,
-      "notes": ""
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork; its check fails with a 404. Unrelated to vite-plus."
     },
     {
       "name": "eslint-plugin-oxlint",
@@ -152,7 +144,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "project-side: `example/server-graphql/scripts/generate-graphql.tsx` imports `oxfmt` without declaring it, so it only resolves through hoisting. Fails with `Cannot find package 'oxfmt'` whenever the lockfile is regenerated. Unrelated to vite-plus."
     },
     {
       "name": "freecut",
@@ -184,7 +176,7 @@
       "branch": "main",
       "packageManager": "npm",
       "monorepo": true,
-      "notes": ""
+      "notes": "fork-CI noise: the `check-label` job requires every PR to carry a `changelog:***` label, so ecosystem-ci test PRs always fail it. The `lint-build` job also runs project meta-checks (`knip`, `check-overrides`) that fail whenever dependencies change. Unrelated to vite-plus."
     },
     {
       "name": "koel",
@@ -192,7 +184,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": false,
-      "notes": ""
+      "notes": "pinned to a very old vite-plus (0.1.x) and still using the removed `@voidzero-dev/vite-plus-test` alias, so `vp migrate` performs a multi-release jump. Resulting TypeScript errors are not evidence about the release under test. Re-pin before using it as an upgrade signal."
     },
     {
       "name": "matterviz",
@@ -200,7 +192,7 @@
       "branch": "main",
       "packageManager": "node",
       "monorepo": false,
-      "notes": ""
+      "notes": "blocked: `@janosh/vite-config` resolves to a package with no `main`/`module`/`exports`, so loading `vite.config.ts` fails with `Failed to resolve entry for package \"@janosh/vite-config\"`. No vite-plus version can run here until the dependency is fixed."
     },
     {
       "name": "mcp-omnisearch",
@@ -208,7 +200,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "preview-build limitation: the Docker build context does not carry the bridge `.npmrc`, so `pnpm install --frozen-lockfile` inside the image rejects the commit-build tarball URLs with `ERR_PNPM_TARBALL_URL_MISMATCH`. Cannot happen for a real npm release."
     },
     {
       "name": "media-processors",
@@ -216,15 +208,7 @@
       "branch": "develop",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
-    },
-    {
-      "name": "mlx-node",
-      "upstream": "mlx-node/mlx-node",
-      "branch": "main",
-      "packageManager": "yarn",
-      "monorepo": true,
-      "notes": ""
+      "notes": "project-side: a package imports `esbuild` without declaring it and only resolves it through hoisting, so it fails with `Cannot find package 'esbuild'` whenever the lockfile is regenerated. Unrelated to vite-plus."
     },
     {
       "name": "museeks",
@@ -272,7 +256,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "fork-CI noise: publish/release steps need `NODE_AUTH_TOKEN`, which the fork does not have, so they fail with `Failed to replace env in config: ${NODE_AUTH_TOKEN}`. Unrelated to vite-plus. NOTE: the org fork is actually named `playground` (GitHub redirects `oxc-playground`), so `gh` calls that build a URL from this name land on the redirect."
     },
     {
       "name": "oxc-walker",
@@ -328,7 +312,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "no pull_request-triggered workflow of its own (only `release.yml` on tags), so a test PR reports \"no checks\". Add an `ecosystem-ci build` workflow running `vp run build` on the test branch; see \"Forks with no PR CI\" in TESTING.md."
     },
     {
       "name": "regle",
@@ -368,15 +352,7 @@
       "branch": "main",
       "packageManager": "node",
       "monorepo": false,
-      "notes": ""
-    },
-    {
-      "name": "tech-interview-handbook",
-      "upstream": "yangshun/tech-interview-handbook",
-      "branch": "main",
-      "packageManager": "pnpm",
-      "monorepo": true,
-      "notes": ""
+      "notes": "blocked: same `@janosh/vite-config` problem as matterviz. The package has no entry point, so `vite.config.ts` cannot load and no checks run."
     },
     {
       "name": "trpc-nuxt",
@@ -400,7 +376,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork; its check fails with a 404. Unrelated to vite-plus."
     },
     {
       "name": "urllib",
@@ -408,7 +384,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "fork-CI noise: the CodSpeedHQ/action step fails on the fork (installer hash pin mismatch and `401 Unauthorized` on upload) because the fork has no CodSpeed token. Unrelated to vite-plus."
     },
     {
       "name": "v-offline",
@@ -451,20 +427,12 @@
       "notes": ""
     },
     {
-      "name": "vize",
-      "upstream": "ubugeeei/vize",
-      "branch": "main",
-      "packageManager": "pnpm",
-      "monorepo": true,
-      "notes": ""
-    },
-    {
       "name": "vue-clamp",
       "upstream": "Justineo/vue-clamp",
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork (404), and the test job flakes on `ResizeObserver loop completed with undelivered notifications`. Both unrelated to vite-plus."
     },
     {
       "name": "vue-core",
