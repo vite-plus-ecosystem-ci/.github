@@ -119,6 +119,8 @@ jq -r '.repos[] | select(.packageManager=="other") | "\(.name) (\(.upstream))"' 
 
 Select a fork whose pinned `vite-plus` version is the immediately previous release. Migrate then does a real upgrade instead of no work.
 
+**A failed local migrate is a starting point, not a verdict.** When a full-catalog sweep drives this harness, it is tempting to gate the fork-PR step on a clean local run and skip whatever failed. Do not stop there. Most of these failures are one-line config problems in the project, not vite-plus problems: see "Supply-chain gates that reject the preview build" and "Forks pinning an old pnpm". Fix each one on the test branch, rerun the migrate, and open the PR. A skipped fork contributes nothing to the release signal, and the skip is invisible in a pass/fail tally.
+
 ## Smoke-test via a fork PR (CI)
 
 A local `vp migrate` does not exercise the project's own CI. To do that, open a draft PR on the fork. The CI of that fork then runs against the prerelease. The mandatory rule above still applies: the PR targets the fork, never the upstream.
@@ -316,11 +318,59 @@ A self-hosted or third-party runner label resolves only for the upstream org. On
 
 Replace the longest label first. Replace the `-arm` label before the plain label, so that no partly rewritten string remains. Runner-specific **actions** need more work than a label change, and that work is usually not worth the cost. Examples are `useblacksmith/begin-testbox`, `useblacksmith/run-testbox`, and cache actions of the same provider. Leave those jobs in the failed state, and record them in `notes`.
 
+### Supply-chain gates that reject the preview build
+
+A project can configure its package manager to refuse a package that is new or that lacks provenance. The install then fails before any test runs, so the fork produces no signal at all. Do not report these as failures and move on. Fix each one on the test branch, then rerun the migrate. Every fix below is a one-line config change.
+
+| Gate | Error you see | Test-branch fix |
+| --- | --- | --- |
+| pnpm `trustPolicy: no-downgrade` | `ERR_PNPM_TRUST_DOWNGRADE ... (possible package takeover)` | Add `trustPolicyExclude: [vite-plus, "@voidzero-dev/*"]` to `pnpm-workspace.yaml` |
+| pnpm `minimumReleaseAge` | `ERR_PNPM_...` naming a too-new version | Add the same names to `minimumReleaseAgeExclude` |
+| pnpm `strictPeerDependencies: true` | `ERR_PNPM_PEER_DEP_ISSUES` | Set `strictPeerDependencies: false` |
+| npm `min-release-age=N` in `.npmrc` | `npm error code ETARGET ... with a date before <date>` | Set `min-release-age=0` |
+| bun `minimumReleaseAge` in `bunfig.toml` | `was published within minimum release age of N seconds` | Set `minimumReleaseAge = 0` |
+
+Three details that cost time if you do not know them:
+
+- **`trustPolicy` also fires on unrelated third-party packages.** pnpm compares every earlier-published version across **all** majors, so a package whose other major line has provenance trips the check ([pnpm/pnpm#10202](https://github.com/pnpm/pnpm/issues/10202)). `semver@6.3.1` and `cytoscape@3.34.1` are confirmed cases. A regenerated lockfile is what exposes them. Add the offending name to `trustPolicyExclude` too, with a comment pointing at the upstream issue.
+- **Glob support differs between the two pnpm settings and bun.** `@voidzero-dev/*` matches in pnpm's `trustPolicyExclude` and `minimumReleaseAgeExclude`. It does **not** match in bun's `minimumReleaseAgeExcludes`; only exact names work there, so set `minimumReleaseAge = 0` rather than listing every platform package.
+- **A release-age gate is not purely a preview-build artifact.** `trustPolicy` is, because real releases are published with provenance and bridge builds are not. A release-age gate keys off publish time, so it rejects a *real* `vite-plus@X.Y.Z` on release day too and only clears a few days later. Say which of the two you are looking at when you report it.
+
+### Forks pinning an old pnpm
+
+**pnpm 9.9.0 stalls forever installing through the registry bridge.** The process sits at 0% CPU with no output and no error, which reads like a vite-plus hang and is not one. The same project installs normally with a current pnpm.
+
+Check `packageManager` in `package.json`. If it pins pnpm `<= 9.9.0`, bump it to the latest v9 on the test branch before you conclude anything:
+
+```bash
+npm view pnpm@9 version   # latest v9
+```
+
+Keep it on the same major, so the lockfile format does not change. Only bump the pin; do not touch the lockfile by hand.
+
+## Fixing lint failures after an oxlint upgrade
+
+A vite-plus release that bumps oxlint makes new rules fire on code that passed before. This is the single largest class of fork-CI failure after a release, and most of it is fixable. Work in this order and stop at the first step that clears the errors:
+
+1. **`vp lint --fix`.** This clears every autofixable rule. On one project it removed 383 of 1099 errors across 160 files.
+2. **Fix the code.** Use the rule's `help:` text. Prefer mechanical, behaviour-preserving edits: wrapping a concise arrow body in a block for `no-promise-executor-return`, renaming a deprecated field, rendering a looked-up component through `createElement` for `react/static-components`.
+3. **Turn the rule off in the project's own config** when a code fix would change behaviour or fight an idiom the codebase uses deliberately. `.sort()` mutates in place and `toSorted()` does not, so `unicorn/no-array-sort` is not a safe mechanical rewrite. Neither is unpicking `??=` lazy init for `no-multi-assign`, nor restyling several hundred declarations for `one-var` and `sort-vars`.
+
+Step 3 is legitimate rather than a cop-out when the project opts whole categories (`style`, `pedantic`, `restriction`, `nursery`) into `error` and then disables individual rules it disagrees with. That config shape is common, and adding one more entry follows the project's own intent. Check whether it already disables sibling rules such as `sort-imports` and `sort-keys`.
+
+Three traps:
+
+- **A `rules` key added after a spread replaces the whole inherited map.** With `lint: { ...config.lint, rules: { ... } }` you silently drop every rule the shared config disabled; one project went from 5 errors to over 2600. Always spread first: `rules: { ...config.lint?.rules, 'my-rule': 'off' }`.
+- **Ignore errors that only exist locally.** `Cannot find module '../../dist/...'`, an unbuilt workspace package, or an ungenerated Prisma client are artifacts of not having run the project's build. CI builds first and never sees them. Do not chase them.
+- **Re-lint and re-test after every code fix, and baseline the failures.** Dropping an unused `test.each` callback parameter breaks the callback's arity and produces fresh type errors. Before blaming your edit for a failing test, stash your changes and rerun: several of these projects have pre-existing failures.
+
 ## CI caveats
 
 - A `push` event triggers the CI of some forks, and a `pull_request` event does not. `notes` flags these forks; `codiff` and `delta-comic` are examples. A PR against them does not run their CI. If you need PR CI, add a `pull_request` trigger to the `on:` block of the workflow **inside the ecosystem-ci PR**. Do not add it as a separate commit on the tracked branch. The fork then stays clean against upstream.
 - Keep the tracked branch clean. Do not commit unrelated changes to it. It must differ from upstream only by the changes that a release test needs.
+- **Do not run `vp fmt` blindly before committing.** The advice to run it exists because a newer oxfmt formats files the previous one left alone. On a project that oxfmt has never formatted, it rewrites the whole tree: one commit reached 562 files and 73k lines, which buries the upgrade and makes the PR unreviewable. Check `git diff --stat` first. If the count is far above the file count that `vp migrate` reported as rewritten, drop the `vp fmt` and commit the migration alone.
 - **A non-standard installer does not resolve preview builds.** The preview-build smoke test needs the project's CI to resolve `vite-plus@0.0.0-commit.<sha>` through the registry bridge in `.npmrc`. This works for npm, pnpm, yarn, and bun. It fails for an installer that ignores the `registry=` line in `.npmrc` or that uses its own registry. `cnpmcore` is the known case: its CI installs with `utoo` (`ut`, through `utooland/setup-utoo`), which resolves against public npm and returns a 404 for the commit build (`No matching version found ... from N available versions`). Check the CI install step of a candidate repo before you trust its fork-CI result. Record each known case in `notes`.
+- **A registry-scanning proxy can also block the bridge.** A CI that installs behind a supply-chain proxy, such as Socket Firewall (`sfw vp install`), can fail to reach `registry-bridge.viteplus.dev` at all and report `ERR_PNPM_META_FETCH_FAIL` / `ERR_PNPM_RESOLVING_NPM_RESOLVER_NETWORK_ERROR`. Confirm the bridge itself is healthy with `curl` before you call it a bridge outage. A real npm release resolves from `registry.npmjs.org` and is unaffected.
 
 ## Maintaining the catalog
 
@@ -387,6 +437,8 @@ Check each classification against the log of that failing job. Do not use the lo
 
 ### Drift check (manifest vs actual org repos)
 
+**Run this before a release sweep, not only when maintaining the catalog.** Every tool here iterates `ecosystem.json`, so an org fork that is missing from the manifest is skipped in silence and nobody notices until someone asks why a given project has no PR.
+
 ```bash
 comm -3 \
   <(jq -r '.repos[].name' ecosystem.json | sort) \
@@ -394,6 +446,19 @@ comm -3 \
 # left-only  = in manifest but not in org (stale entry)
 # right-only = fork exists but is not catalogued
 ```
+
+Every right-only name must be either in the manifest or in "Excluded repos" with a reason. Anything else is an accidental gap: add it, or exclude it explicitly. Two names resolve to something benign and are worth knowing: `playground` is the real name of the `oxc-playground` entry (GitHub redirects the old name), and the excluded repos stay in the org on purpose.
+
+### Detached forks
+
+Some org repos report `parent: null`, so GitHub does not treat them as forks. `gh repo fork` cannot re-link one, and `scripts/setup-local.sh` cannot derive its `source` remote. Detect and repair by hand:
+
+```bash
+gh repo view vite-plus-ecosystem-ci/<name> --json parent --jq '.parent.nameWithOwner // "DETACHED"'
+git -C "$dir" remote add source git@github.com:<upstream>.git
+```
+
+Record the upstream in the manifest entry as usual, and note the detachment in `notes` so the next person does not retry `gh repo fork`. These repos drift the furthest, because nothing syncs them: one was 122 commits behind. Fast-forward it before testing, exactly as for a normal fork.
 
 ## How vite-plus references this
 
