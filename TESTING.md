@@ -283,7 +283,9 @@ Apply the two fixes below to the **test branch only**. Never apply them to the t
 
 ### Forks with no PR CI
 
-Some forks have no workflow that a `pull_request` event triggers. The test PR then reports "no checks", and it proves nothing. Add a minimal build workflow to the test branch. That workflow must exercise the pinned vite-plus, and it must use the setup that the project already uses:
+Some forks have no workflow that a `pull_request` event triggers. The test PR then reports "no checks", and it proves nothing. **Add the workflow yourself, on the test branch, rather than reporting "no checks" and moving on.** Keep doing this each release until the fork's own repo runs a verifiable workflow on pull requests, then delete the added file.
+
+The workflow must exercise the pinned vite-plus, and it must use the setup that the project already uses. Copy the `setup-vp` step out of an existing workflow in the repo, so the node version and install mode match:
 
 ```yaml
 # .github/workflows/ecosystem-ci-build.yml
@@ -300,10 +302,17 @@ jobs:
           node-version: '24'
           cache: false
           run-install: true
-      - run: vp run build
+      - name: vp check
+        run: vp check
+      - name: vp build
+        run: vp build
 ```
 
-Use `vp run build`, so that the job goes through the project's own `build` script. Record the repo in `notes`.
+Run **both** `vp check` and `vp build`. `vp check` covers format, lint, and type-check, which is where an oxlint or oxfmt bump shows up; `vp build` covers the Vite and Rolldown path. A build-only job misses the whole toolchain half of a release. Prefer the built-in `vp build` over `vp run build` unless the project's `build` script does extra work that matters, in which case run that instead.
+
+Head the file with a comment saying why it exists and when to delete it, so nobody mistakes it for the project's own CI. Record the repo in `notes`.
+
+**Run both commands locally before you push the workflow.** A fork that has never had CI has never had these commands run against it, so it usually has pre-existing failures that have nothing to do with the release. Fix those on the test branch too, or the workflow you just added goes red and still proves nothing. `redis-me` is the worked example: `vite.config.ts` uses `path`, `process`, and `import.meta.dirname`, but `@types/node` was absent and `tsconfig.json` limited `types` to `vite/client`, so `vp check` failed with three type errors before the upgrade was ever in question.
 
 ### Forks on third-party runners
 
@@ -408,6 +417,7 @@ These repos are deliberately out of the catalog. Do not add one again before you
 | `cnpmcore` (`cnpm/cnpmcore`) | Its CI installs with `utoo` (`ut`, through `utooland/setup-utoo`). `utoo` ignores the bridge `registry=` line in `.npmrc` and resolves against public npm, so a `0.0.0-commit.<sha>` build returns a 404. Every job then fails, and 135 test files fail, for a cause that cannot occur with a real npm release. Its fork CI gives no information for a preview-build smoke test. |
 | `mlx-node` (`huggingface/mlx-node`) | Both failing jobs are Rust jobs (`cargo test`, `-p mlx-core --test kquant_ggml_parity`), and they do not exercise vite-plus. Its JS surface is too small for the triage cost. |
 | `tech-interview-handbook` (`yangshun/tech-interview-handbook`) | This Docusaurus site fails its build with a webpack error, `ProgressPlugin ... does not match the API schema`, which is unrelated to vite-plus. It has no passing check to balance that failure. |
+| `zerobyte` (`nicotsx/zerobyte`) | It costs work every release and returns nothing. Its `bunfig.toml` sets `minimumReleaseAge = 259200`, so bun refuses any fresh publish and the upgrade needs a test-branch patch every time. Once past that, its own dependency set breaks: a regenerated lockfile pairs `@better-auth/api-key@1.6.27` with `@better-auth/core@1.7.1`, which no longer exports `getIp`, and that one skew fails `build`, `typecheck`, and seven test files. Its `lint` script also hardcodes `node ./node_modules/oxlint/bin/oxlint`, a path the vite-plus toolchain model does not create. No check is left that says anything about the release. |
 
 ### Checks that count as passing
 

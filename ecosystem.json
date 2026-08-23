@@ -320,7 +320,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "no pull_request-triggered workflow of its own (only `release.yml` on tags), so a test PR reports \"no checks\". Add an `ecosystem-ci build` workflow running `vp run build` on the test branch; see \"Forks with no PR CI\" in TESTING.md."
+      "notes": "no pull_request-triggered workflow of its own (only `release.yml` on tags), so a test PR reports \"no checks\". Add `.github/workflows/ecosystem-ci-build.yml` running `vp check` and `vp build` on the test branch each release; see \"Forks with no PR CI\". Also needs `@types/node` and `\"node\"` in the tsconfig `types` array, because `vite.config.ts` uses `path`, `process`, and `import.meta.dirname` and `vp check` fails without them. Drop the added workflow once the repo runs these checks on pull requests itself."
     },
     {
       "name": "regle",
@@ -480,14 +480,6 @@
       "packageManager": "npm",
       "monorepo": true,
       "notes": ""
-    },
-    {
-      "name": "zerobyte",
-      "upstream": "nicotsx/zerobyte",
-      "branch": "main",
-      "packageManager": "bun",
-      "monorepo": true,
-      "notes": "supply-chain gate: `bunfig.toml` sets `minimumReleaseAge = 259200`, so bun refuses any vite-plus published in the last 3 days. Set `minimumReleaseAge = 0` on the test branch; bun's `minimumReleaseAgeExcludes` does not match globs like `@voidzero-dev/*`."
     }
   ]
 }
