@@ -314,6 +314,35 @@ Head the file with a comment saying why it exists and when to delete it, so nobo
 
 **Run both commands locally before you push the workflow.** A fork that has never had CI has never had these commands run against it, so it usually has pre-existing failures that have nothing to do with the release. Fix those on the test branch too, or the workflow you just added goes red and still proves nothing. `redis-me` is the worked example: `vite.config.ts` uses `path`, `process`, and `import.meta.dirname`, but `@types/node` was absent and `tsconfig.json` limited `types` to `vite/client`, so `vp check` failed with three type errors before the upgrade was ever in question.
 
+### Forks that publish a preview package
+
+Many forks run a `pkg-pr-new`, snapshot, or release step on every pull request. That step needs a GitHub App, an npm token, or a deploy target that the fork does not have, so it always fails. It also publishes nothing you want published from a test branch, and it exercises no part of the pinned Vite+. Left alone it is the single largest source of red checks across the catalog.
+
+Skip the step on the test branch instead of explaining it away in `notes`. Gate it on the fork org, so the change stays correct if it ever reaches upstream:
+
+```yaml
+      # Ecosystem-ci smoke test: publishing a preview package needs a GitHub App or
+      # token the fork does not have, and it does not exercise the pinned Vite+.
+      - name: Publish preview package
+        if: ${{ github.repository_owner != 'vite-plus-ecosystem-ci' }}
+        run: <the project's existing publish command>
+```
+
+Gate the **step**, not the job, whenever the job also builds or tests. Those steps are real signal and you want to keep them; only the publish must go. Gate the whole job only when publishing is all it does. A bare `- run: ...` step has nowhere to put a condition, so give it a `name:` first.
+
+Finding them is the part people get wrong: the failing check is often named `build` or `validate`, not `publish`, because the publish step lives inside a validation job. Do not filter by check name. Read the failing steps of every failing job:
+
+```bash
+gh pr checks "$url" --repo "vite-plus-ecosystem-ci/$name" | awk -F'\t' '$2=="fail"{print $4}' |
+  while read -r link; do
+    jid=${link##*job/}; jid=${jid%%\?*}
+    gh api "repos/vite-plus-ecosystem-ci/$name/actions/jobs/$jid" \
+      --jq '.steps[]|select(.conclusion=="failure")|.name'
+  done
+```
+
+Confirmed step names so far: `Publish`, `Publish preview package`, `Publish packages (retry on transient failures)`, `Publish snapshot package`, `Create a snapshot version`, `Release`, `Run vp dlx pkg-pr-new publish`, `Run nlx pkg-pr-new publish`, and `Deploy website to Void`.
+
 ### Forks on third-party runners
 
 A self-hosted or third-party runner label resolves only for the upstream org. On a fork, every job then waits in the queue, and the PR never reports a result. Change the labels to the GitHub-hosted equivalents on the test branch:
@@ -425,7 +454,7 @@ The four classes of failing check below **count as passing** when you score a fo
 
 | Class | How it presents | Why it never means anything |
 | --- | --- | --- |
-| `pkg-pr-new` publish jobs | `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`. Often inside a job named `build`, not a job named after the app. | This org deliberately does not install the App. |
+| `pkg-pr-new` publish jobs | `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`. Often inside a job named `build`, not a job named after the app. | This org deliberately does not install the App. Prefer skipping the step outright, see "Forks that publish a preview package"; count it as a pass only where you have not gated it yet. |
 | commitlint / commit-message checks | `header-max-length`, `subject may not be longer than ...` | The test commit's own subject causes it, not the project's code. Keep the subject short (see "Apply the upgrade"), and count any remaining hit as a pass. |
 | Third-party benchmark and coverage uploads | CodSpeed and similar services that fail with `401 Unauthorized`, or an installer hash-pin mismatch | The fork has no token for the service. |
 | Docker image build/push jobs | `Password required`, `buildx failed`, or `ERR_PNPM_TARBALL_URL_MISMATCH` inside an image build | The fork has no registry credentials. A Docker build context also does not contain the bridge `.npmrc`, so a preview build cannot resolve inside the image. |

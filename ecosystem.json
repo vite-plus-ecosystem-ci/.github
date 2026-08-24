@@ -32,7 +32,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork, so its check fails with `Check failed (404): The app https://github.com/apps/pkg-pr-new is not installed`. Unrelated to vite-plus."
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork, so its check fails with `Check failed (404): The app https://github.com/apps/pkg-pr-new is not installed`. Unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "brazilian-utils-javascript",
@@ -112,7 +112,7 @@
       "branch": "main",
       "packageManager": "bun",
       "monorepo": false,
-      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork; its check fails with a 404. Unrelated to vite-plus."
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork; its check fails with a 404. Unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "eslint-plugin-oxlint",
@@ -304,7 +304,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `semver@6.3.1` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch."
+      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `semver@6.3.1` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "react-native-onesignal",
@@ -375,7 +375,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "typed-xlsx",
@@ -391,7 +391,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork; its check fails with a 404. Unrelated to vite-plus."
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork; its check fails with a 404. Unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "urllib",
@@ -415,7 +415,7 @@
       "branch": "dev",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "vibe-dashboard",
@@ -439,7 +439,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds. Add `trustPolicyExclude` for `vite-plus` and `@voidzero-dev/*` on the test branch."
+      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds. Add `trustPolicyExclude` for `vite-plus` and `@voidzero-dev/*` on the test branch. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "vue-clamp",
@@ -447,7 +447,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork (404), and the test job flakes on `ResizeObserver loop completed with undelivered notifications`. Both unrelated to vite-plus."
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork (404), and the test job flakes on `ResizeObserver loop completed with undelivered notifications`. Both unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "vue-core",
