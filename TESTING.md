@@ -119,6 +119,8 @@ jq -r '.repos[] | select(.packageManager=="other") | "\(.name) (\(.upstream))"' 
 
 Select a fork whose pinned `vite-plus` version is the immediately previous release. Migrate then does a real upgrade instead of no work.
 
+**A failed local migrate is a starting point, not a verdict.** When a full-catalog sweep drives this harness, it is tempting to gate the fork-PR step on a clean local run and skip whatever failed. Do not stop there. Most of these failures are one-line config problems in the project, not vite-plus problems: see "Supply-chain gates that reject the preview build" and "Forks pinning an old pnpm". Fix each one on the test branch, rerun the migrate, and open the PR. A skipped fork contributes nothing to the release signal, and the skip is invisible in a pass/fail tally.
+
 ## Smoke-test via a fork PR (CI)
 
 A local `vp migrate` does not exercise the project's own CI. To do that, open a draft PR on the fork. The CI of that fork then runs against the prerelease. The mandatory rule above still applies: the PR targets the fork, never the upstream.
@@ -205,6 +207,26 @@ An upgrade failure has two marks: the prerelease does not resolve, build, or tes
 gh api repos/vite-plus-ecosystem-ci/$name/actions/jobs/<job-id>/logs
 ```
 
+### 5. Close the PRs when the release ships
+
+A smoke-test PR is disposable. It exists to produce one CI run against one preview build, and it is worthless once that build is superseded. Close every PR of the cycle after the release ships.
+
+Nobody did this for the first five cycles, and the org reached 310 open prerelease PRs, of which only 57 belonged to the current release. That backlog is not free. Each fork accumulates roughly five stale drafts, which buries the current PR in the fork's list, and every one of them re-runs its whole CI matrix whenever the tracked branch is force-synced.
+
+Close a cycle by its build SHA:
+
+```bash
+sha=<superseded-preview-sha>
+gh api graphql -f query='query($q:String!){search(query:$q,type:ISSUE,first:100){nodes{... on PullRequest{number repository{name}}}}}' \
+  -f q="org:vite-plus-ecosystem-ci is:pr is:open in:title $sha" \
+  --jq '.data.search.nodes[] | "\(.repository.name) \(.number)"' |
+while read -r name number; do
+  gh pr close "$number" --repo "vite-plus-ecosystem-ci/$name" --delete-branch
+done
+```
+
+`--delete-branch` matters as much as the close. The test branch is named for the preview SHA, so leaving it behind keeps a dead ref on the fork forever.
+
 ## Filtering irrelevant fork-CI failures
 
 Across the full catalog, most red checks say nothing about the release. Put every failure into one of the classes below before you make a conclusion. Then report the count for each cause. Do not report only "N failed". `ecosystem.json` records the known per-repo cases in `notes`, so read those first.
@@ -281,7 +303,9 @@ Apply the two fixes below to the **test branch only**. Never apply them to the t
 
 ### Forks with no PR CI
 
-Some forks have no workflow that a `pull_request` event triggers. The test PR then reports "no checks", and it proves nothing. Add a minimal build workflow to the test branch. That workflow must exercise the pinned vite-plus, and it must use the setup that the project already uses:
+Some forks have no workflow that a `pull_request` event triggers. The test PR then reports "no checks", and it proves nothing. **Add the workflow yourself, on the test branch, rather than reporting "no checks" and moving on.** Keep doing this each release until the fork's own repo runs a verifiable workflow on pull requests, then delete the added file.
+
+The workflow must exercise the pinned vite-plus, and it must use the setup that the project already uses. Copy the `setup-vp` step out of an existing workflow in the repo, so the node version and install mode match:
 
 ```yaml
 # .github/workflows/ecosystem-ci-build.yml
@@ -298,10 +322,46 @@ jobs:
           node-version: '24'
           cache: false
           run-install: true
-      - run: vp run build
+      - name: vp check
+        run: vp check
+      - name: vp build
+        run: vp build
 ```
 
-Use `vp run build`, so that the job goes through the project's own `build` script. Record the repo in `notes`.
+Run **both** `vp check` and `vp build`. `vp check` covers format, lint, and type-check, which is where an oxlint or oxfmt bump shows up; `vp build` covers the Vite and Rolldown path. A build-only job misses the whole toolchain half of a release. Prefer the built-in `vp build` over `vp run build` unless the project's `build` script does extra work that matters, in which case run that instead.
+
+Head the file with a comment saying why it exists and when to delete it, so nobody mistakes it for the project's own CI. Record the repo in `notes`.
+
+**Run both commands locally before you push the workflow.** A fork that has never had CI has never had these commands run against it, so it usually has pre-existing failures that have nothing to do with the release. Fix those on the test branch too, or the workflow you just added goes red and still proves nothing. `redis-me` is the worked example: `vite.config.ts` uses `path`, `process`, and `import.meta.dirname`, but `@types/node` was absent and `tsconfig.json` limited `types` to `vite/client`, so `vp check` failed with three type errors before the upgrade was ever in question.
+
+### Forks that publish a preview package
+
+Many forks run a `pkg-pr-new`, snapshot, or release step on every pull request. That step needs a GitHub App, an npm token, or a deploy target that the fork does not have, so it always fails. It also publishes nothing you want published from a test branch, and it exercises no part of the pinned Vite+. Left alone it is the single largest source of red checks across the catalog.
+
+Skip the step on the test branch instead of explaining it away in `notes`. Gate it on the fork org, so the change stays correct if it ever reaches upstream:
+
+```yaml
+      # Ecosystem-ci smoke test: publishing a preview package needs a GitHub App or
+      # token the fork does not have, and it does not exercise the pinned Vite+.
+      - name: Publish preview package
+        if: ${{ github.repository_owner != 'vite-plus-ecosystem-ci' }}
+        run: <the project's existing publish command>
+```
+
+Gate the **step**, not the job, whenever the job also builds or tests. Those steps are real signal and you want to keep them; only the publish must go. Gate the whole job only when publishing is all it does. A bare `- run: ...` step has nowhere to put a condition, so give it a `name:` first.
+
+Finding them is the part people get wrong: the failing check is often named `build` or `validate`, not `publish`, because the publish step lives inside a validation job. Do not filter by check name. Read the failing steps of every failing job:
+
+```bash
+gh pr checks "$url" --repo "vite-plus-ecosystem-ci/$name" | awk -F'\t' '$2=="fail"{print $4}' |
+  while read -r link; do
+    jid=${link##*job/}; jid=${jid%%\?*}
+    gh api "repos/vite-plus-ecosystem-ci/$name/actions/jobs/$jid" \
+      --jq '.steps[]|select(.conclusion=="failure")|.name'
+  done
+```
+
+Confirmed step names so far: `Publish`, `Publish preview package`, `Publish packages (retry on transient failures)`, `Publish snapshot package`, `Create a snapshot version`, `Release`, `Run vp dlx pkg-pr-new publish`, `Run nlx pkg-pr-new publish`, and `Deploy website to Void`.
 
 ### Forks on third-party runners
 
@@ -316,11 +376,59 @@ A self-hosted or third-party runner label resolves only for the upstream org. On
 
 Replace the longest label first. Replace the `-arm` label before the plain label, so that no partly rewritten string remains. Runner-specific **actions** need more work than a label change, and that work is usually not worth the cost. Examples are `useblacksmith/begin-testbox`, `useblacksmith/run-testbox`, and cache actions of the same provider. Leave those jobs in the failed state, and record them in `notes`.
 
+### Supply-chain gates that reject the preview build
+
+A project can configure its package manager to refuse a package that is new or that lacks provenance. The install then fails before any test runs, so the fork produces no signal at all. Do not report these as failures and move on. Fix each one on the test branch, then rerun the migrate. Every fix below is a one-line config change.
+
+| Gate | Error you see | Test-branch fix |
+| --- | --- | --- |
+| pnpm `trustPolicy: no-downgrade` | `ERR_PNPM_TRUST_DOWNGRADE ... (possible package takeover)` | Add `trustPolicyExclude: [vite-plus, "@voidzero-dev/*"]` to `pnpm-workspace.yaml` |
+| pnpm `minimumReleaseAge` | `ERR_PNPM_...` naming a too-new version | Add the same names to `minimumReleaseAgeExclude` |
+| pnpm `strictPeerDependencies: true` | `ERR_PNPM_PEER_DEP_ISSUES` | Set `strictPeerDependencies: false` |
+| npm `min-release-age=N` in `.npmrc` | `npm error code ETARGET ... with a date before <date>` | Set `min-release-age=0` |
+| bun `minimumReleaseAge` in `bunfig.toml` | `was published within minimum release age of N seconds` | Set `minimumReleaseAge = 0` |
+
+Three details that cost time if you do not know them:
+
+- **`trustPolicy` also fires on unrelated third-party packages.** pnpm compares every earlier-published version across **all** majors, so a package whose other major line has provenance trips the check ([pnpm/pnpm#10202](https://github.com/pnpm/pnpm/issues/10202)). `semver@6.3.1` and `cytoscape@3.34.1` are confirmed cases. A regenerated lockfile is what exposes them. Add the offending name to `trustPolicyExclude` too, with a comment pointing at the upstream issue.
+- **Glob support differs between the two pnpm settings and bun.** `@voidzero-dev/*` matches in pnpm's `trustPolicyExclude` and `minimumReleaseAgeExclude`. It does **not** match in bun's `minimumReleaseAgeExcludes`; only exact names work there, so set `minimumReleaseAge = 0` rather than listing every platform package.
+- **A release-age gate is not purely a preview-build artifact.** `trustPolicy` is, because real releases are published with provenance and bridge builds are not. A release-age gate keys off publish time, so it rejects a *real* `vite-plus@X.Y.Z` on release day too and only clears a few days later. Say which of the two you are looking at when you report it.
+
+### Forks pinning an old pnpm
+
+**pnpm 9.9.0 stalls forever installing through the registry bridge.** The process sits at 0% CPU with no output and no error, which reads like a vite-plus hang and is not one. The same project installs normally with a current pnpm.
+
+Check `packageManager` in `package.json`. If it pins pnpm `<= 9.9.0`, bump it to the latest v9 on the test branch before you conclude anything:
+
+```bash
+npm view pnpm@9 version   # latest v9
+```
+
+Keep it on the same major, so the lockfile format does not change. Only bump the pin; do not touch the lockfile by hand.
+
+## Fixing lint failures after an oxlint upgrade
+
+A vite-plus release that bumps oxlint makes new rules fire on code that passed before. This is the single largest class of fork-CI failure after a release, and most of it is fixable. Work in this order and stop at the first step that clears the errors:
+
+1. **`vp lint --fix`.** This clears every autofixable rule. On one project it removed 383 of 1099 errors across 160 files.
+2. **Fix the code.** Use the rule's `help:` text. Prefer mechanical, behaviour-preserving edits: wrapping a concise arrow body in a block for `no-promise-executor-return`, renaming a deprecated field, rendering a looked-up component through `createElement` for `react/static-components`.
+3. **Turn the rule off in the project's own config** when a code fix would change behaviour or fight an idiom the codebase uses deliberately. `.sort()` mutates in place and `toSorted()` does not, so `unicorn/no-array-sort` is not a safe mechanical rewrite. Neither is unpicking `??=` lazy init for `no-multi-assign`, nor restyling several hundred declarations for `one-var` and `sort-vars`.
+
+Step 3 is legitimate rather than a cop-out when the project opts whole categories (`style`, `pedantic`, `restriction`, `nursery`) into `error` and then disables individual rules it disagrees with. That config shape is common, and adding one more entry follows the project's own intent. Check whether it already disables sibling rules such as `sort-imports` and `sort-keys`.
+
+Three traps:
+
+- **A `rules` key added after a spread replaces the whole inherited map.** With `lint: { ...config.lint, rules: { ... } }` you silently drop every rule the shared config disabled; one project went from 5 errors to over 2600. Always spread first: `rules: { ...config.lint?.rules, 'my-rule': 'off' }`.
+- **Ignore errors that only exist locally.** `Cannot find module '../../dist/...'`, an unbuilt workspace package, or an ungenerated Prisma client are artifacts of not having run the project's build. CI builds first and never sees them. Do not chase them.
+- **Re-lint and re-test after every code fix, and baseline the failures.** Dropping an unused `test.each` callback parameter breaks the callback's arity and produces fresh type errors. Before blaming your edit for a failing test, stash your changes and rerun: several of these projects have pre-existing failures.
+
 ## CI caveats
 
 - A `push` event triggers the CI of some forks, and a `pull_request` event does not. `notes` flags these forks; `codiff` and `delta-comic` are examples. A PR against them does not run their CI. If you need PR CI, add a `pull_request` trigger to the `on:` block of the workflow **inside the ecosystem-ci PR**. Do not add it as a separate commit on the tracked branch. The fork then stays clean against upstream.
 - Keep the tracked branch clean. Do not commit unrelated changes to it. It must differ from upstream only by the changes that a release test needs.
+- **Do not run `vp fmt` blindly before committing.** The advice to run it exists because a newer oxfmt formats files the previous one left alone. On a project that oxfmt has never formatted, it rewrites the whole tree: one commit reached 562 files and 73k lines, which buries the upgrade and makes the PR unreviewable. Check `git diff --stat` first. If the count is far above the file count that `vp migrate` reported as rewritten, drop the `vp fmt` and commit the migration alone.
 - **A non-standard installer does not resolve preview builds.** The preview-build smoke test needs the project's CI to resolve `vite-plus@0.0.0-commit.<sha>` through the registry bridge in `.npmrc`. This works for npm, pnpm, yarn, and bun. It fails for an installer that ignores the `registry=` line in `.npmrc` or that uses its own registry. `cnpmcore` is the known case: its CI installs with `utoo` (`ut`, through `utooland/setup-utoo`), which resolves against public npm and returns a 404 for the commit build (`No matching version found ... from N available versions`). Check the CI install step of a candidate repo before you trust its fork-CI result. Record each known case in `notes`.
+- **A registry-scanning proxy can also block the bridge.** A CI that installs behind a supply-chain proxy, such as Socket Firewall (`sfw vp install`), can fail to reach `registry-bridge.viteplus.dev` at all and report `ERR_PNPM_META_FETCH_FAIL` / `ERR_PNPM_RESOLVING_NPM_RESOLVER_NETWORK_ERROR`. Confirm the bridge itself is healthy with `curl` before you call it a bridge outage. A real npm release resolves from `registry.npmjs.org` and is unaffected.
 
 ## Maintaining the catalog
 
@@ -344,6 +452,32 @@ Set the fields as follows.
 - **The CI install step.** Check how the project's CI installs dependencies, because a non-standard installer breaks the preview-build smoke test. `cnpmcore`'s CI installs with `utoo` (`ut`), which does not resolve `vite-plus@0.0.0-commit.<sha>` through the bridge `.npmrc`. Its smoke test therefore fails during dependency resolution. Record this in `notes`.
 - **`monorepo`.** Set this field when the project has a `workspaces` field, a `pnpm-workspace.yaml` file, or a `packages/` directory.
 
+### Find new candidates
+
+The catalog grows by chance otherwise, and it drifts toward whatever the last person happened to notice. Sweep for real consumers instead. Search code for the dependency and for `vp` in scripts, then verify each hit by reading its root `package.json`, because the legacy search engine tokenizes and returns many false positives:
+
+```bash
+for q in '"vite-plus" filename:package.json' '"vp check" filename:package.json' \
+         '"vp test" filename:package.json'  '"vp build" filename:package.json' \
+         '"vp lint" filename:package.json'  '"vp fmt" filename:package.json' \
+         '"vp config" filename:package.json' '"vite-plus" filename:pnpm-workspace.yaml' \
+         '"@voidzero-dev/vite-plus-core"'   '"voidzero-dev/setup-vp"'; do
+  gh search code "$q" --limit 100 --json repository --jq '.[].repository.nameWithOwner'
+  sleep 7   # code search allows 10 requests per minute
+done | tr 'A-Z' 'a-z' | sort -u
+```
+
+A repo qualifies when it declares a `vite-plus` dependency or runs `vp` in a script. Subtract `.repos[].upstream` and the excluded list from the result. The 2026-08-26 sweep returned 256 uncatalogued consumers, 28 of them at 1k+ stars, so expect the leftover set to stay large. Each query caps at 100 results, so the total is a lower bound.
+
+Rank what is left on four things, in this order:
+
+1. **Coverage the catalog lacks.** This beats star count. The same sweep found the catalog held 48 pnpm repos and not one yarn repo, so `vp migrate` and the yarn install path went untested every release. `react-hookz-web` was added for that reason alone.
+2. **A `pull_request` workflow that needs no secrets.** Without one the fork produces no signal. Read the `on:` block, then grep the file for `secrets.` and for `blacksmith` or `self-hosted` runners.
+3. **Depth of `vp` use.** Count the scripts that invoke `vp`. A repo with one `vp fmt` script tests almost nothing; `orval` has 19.
+4. **Star count**, last.
+
+Prefer a project pinned to the previous release, since it exercises a real upgrade. Only 8 of those 256 were on `0.2.9`, while 109 tracked `catalog:` and 33 tracked `latest`, so pinned-to-previous is scarce and worth keeping when you find it.
+
 ### Remove a repo
 
 Delete the entry of the repo from `ecosystem.json`. You can also delete the fork with `gh repo delete vite-plus-ecosystem-ci/<name>`, but the fork does no harm, and tooling reads only the manifest. Add a line to "Excluded repos" below. The next person then does not add the repo again and repeat the work.
@@ -358,6 +492,8 @@ These repos are deliberately out of the catalog. Do not add one again before you
 | `cnpmcore` (`cnpm/cnpmcore`) | Its CI installs with `utoo` (`ut`, through `utooland/setup-utoo`). `utoo` ignores the bridge `registry=` line in `.npmrc` and resolves against public npm, so a `0.0.0-commit.<sha>` build returns a 404. Every job then fails, and 135 test files fail, for a cause that cannot occur with a real npm release. Its fork CI gives no information for a preview-build smoke test. |
 | `mlx-node` (`huggingface/mlx-node`) | Both failing jobs are Rust jobs (`cargo test`, `-p mlx-core --test kquant_ggml_parity`), and they do not exercise vite-plus. Its JS surface is too small for the triage cost. |
 | `tech-interview-handbook` (`yangshun/tech-interview-handbook`) | This Docusaurus site fails its build with a webpack error, `ProgressPlugin ... does not match the API schema`, which is unrelated to vite-plus. It has no passing check to balance that failure. |
+| `zerobyte` (`nicotsx/zerobyte`) | It costs work every release and returns nothing. Its `bunfig.toml` sets `minimumReleaseAge = 259200`, so bun refuses any fresh publish and the upgrade needs a test-branch patch every time. Once past that, its own dependency set breaks: a regenerated lockfile pairs `@better-auth/api-key@1.6.27` with `@better-auth/core@1.7.1`, which no longer exports `getIp`, and that one skew fails `build`, `typecheck`, and seven test files. Its `lint` script also hardcodes `node ./node_modules/oxlint/bin/oxlint`, a path the vite-plus toolchain model does not create. No check is left that says anything about the release. |
+| `monorepo` (`zap-studio/monorepo`) | It does not use vite-plus. Its scripts call `oxlint`, `oxfmt`, `tsdown`, and `vitest` directly through `pnpm exec`, and no script runs `vp`. A version bump therefore changes nothing that its CI executes. Migrate it first if you want it in the catalog. |
 
 ### Checks that count as passing
 
@@ -365,7 +501,7 @@ The four classes of failing check below **count as passing** when you score a fo
 
 | Class | How it presents | Why it never means anything |
 | --- | --- | --- |
-| `pkg-pr-new` publish jobs | `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`. Often inside a job named `build`, not a job named after the app. | This org deliberately does not install the App. |
+| `pkg-pr-new` publish jobs | `The app https://github.com/apps/pkg-pr-new is not installed on vite-plus-ecosystem-ci/<repo>`. Often inside a job named `build`, not a job named after the app. | This org deliberately does not install the App. Prefer skipping the step outright, see "Forks that publish a preview package"; count it as a pass only where you have not gated it yet. |
 | commitlint / commit-message checks | `header-max-length`, `subject may not be longer than ...` | The test commit's own subject causes it, not the project's code. Keep the subject short (see "Apply the upgrade"), and count any remaining hit as a pass. |
 | Third-party benchmark and coverage uploads | CodSpeed and similar services that fail with `401 Unauthorized`, or an installer hash-pin mismatch | The fork has no token for the service. |
 | Docker image build/push jobs | `Password required`, `buildx failed`, or `ERR_PNPM_TARBALL_URL_MISMATCH` inside an image build | The fork has no registry credentials. A Docker build context also does not contain the bridge `.npmrc`, so a preview build cannot resolve inside the image. |
@@ -387,6 +523,8 @@ Check each classification against the log of that failing job. Do not use the lo
 
 ### Drift check (manifest vs actual org repos)
 
+**Run this before a release sweep, not only when maintaining the catalog.** Every tool here iterates `ecosystem.json`, so an org fork that is missing from the manifest is skipped in silence and nobody notices until someone asks why a given project has no PR.
+
 ```bash
 comm -3 \
   <(jq -r '.repos[].name' ecosystem.json | sort) \
@@ -394,6 +532,21 @@ comm -3 \
 # left-only  = in manifest but not in org (stale entry)
 # right-only = fork exists but is not catalogued
 ```
+
+Every right-only name must be either in the manifest or in "Excluded repos" with a reason. Anything else is an accidental gap: add it, or exclude it explicitly. Two names resolve to something benign and are worth knowing: `playground` is the real name of the `oxc-playground` entry (GitHub redirects the old name), and the excluded repos stay in the org on purpose.
+
+The gap is easy to underrate, so treat the check as a required step rather than a cleanup task. Skipping it in the v0.3.0 sweep hid three forks, and one of them was `cloudflare/vinext`: 8.6k stars, and its `package.json` drives the whole toolchain through `vp config`, `vp run`, `vp check`, `vp lint`, `vp fmt`, and `vp test`. The fork had sat unsynced for seven weeks and 292 commits, and no sweep had ever touched it, because nothing reads the org list. A missing manifest entry produces no error anywhere. It produces silence.
+
+### Detached forks
+
+Some org repos report `parent: null`, so GitHub does not treat them as forks. `gh repo fork` cannot re-link one, and `scripts/setup-local.sh` cannot derive its `source` remote. Detect and repair by hand:
+
+```bash
+gh repo view vite-plus-ecosystem-ci/<name> --json parent --jq '.parent.nameWithOwner // "DETACHED"'
+git -C "$dir" remote add source git@github.com:<upstream>.git
+```
+
+Record the upstream in the manifest entry as usual, and note the detachment in `notes` so the next person does not retry `gh repo fork`. These repos drift the furthest, because nothing syncs them: one was 122 commits behind. Fast-forward it before testing, exactly as for a normal fork.
 
 ## How vite-plus references this
 

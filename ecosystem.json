@@ -32,7 +32,15 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork, so its check fails with `Check failed (404): The app https://github.com/apps/pkg-pr-new is not installed`. Unrelated to vite-plus."
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork, so its check fails with `Check failed (404): The app https://github.com/apps/pkg-pr-new is not installed`. Unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
+    },
+    {
+      "name": "BlockNote",
+      "upstream": "TypeCellOS/BlockNote",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "BlockNote. 15 `vp` scripts, mostly `vp run -r`. `build.yml` runs on `pull_request` without secrets. `minimumReleaseAge: 1440` is already excluded for `vite-plus` and `@voidzero-dev/*`, so no supply-chain patch is needed."
     },
     {
       "name": "brazilian-utils-javascript",
@@ -41,6 +49,14 @@
       "packageManager": "pnpm",
       "monorepo": false,
       "notes": "fork-CI noise: the `Test on Deno` job fails on `expect(...).toHaveBeenCalledTimes is not a function`, a Deno test-environment issue independent of the vite-plus version."
+    },
+    {
+      "name": "cloudflare-os",
+      "upstream": "cloudflare/cloudflare-os",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "`ci.yml` runs on `pull_request` without secrets. `pnpm-workspace.yaml` sets `minimumReleaseAge: 1440` and its exclude list omits vite-plus, so add `vite-plus` and `@voidzero-dev/*` to `minimumReleaseAgeExclude` on the test branch. That gate keys off publish time, so it also rejects a real release on release day. Gate `preview.yml`, `bonk*.yml`, and `cla.yml`, which need credentials the fork lacks."
     },
     {
       "name": "codiff",
@@ -83,6 +99,14 @@
       "notes": "CI triggers on push only; PRs do not run CI unless the workflow adds a pull_request trigger"
     },
     {
+      "name": "dify",
+      "upstream": "langgenius/dify",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "Dify. Largest catalogued vite-plus consumer. `vp check`, `vp lint`, `vp config`, and `vp run` drive the TS side; `api/` is Python and does not. `main-ci.yml` runs on `pull_request` without secrets. `pnpm-workspace.yaml` sets `trustPolicy: no-downgrade` and its `trustPolicyExclude` does not list vite-plus, so add `vite-plus` and `@voidzero-dev/*` there on the test branch or the preview build is rejected. Its `minimumReleaseAgeExclude` already covers the toolchain. 36 workflows, so read the failing job rather than the first red check."
+    },
+    {
       "name": "digital-signature",
       "upstream": "Jisu-Woniu/digital-signature",
       "branch": "main",
@@ -112,7 +136,7 @@
       "branch": "main",
       "packageManager": "bun",
       "monorepo": false,
-      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork; its check fails with a 404. Unrelated to vite-plus."
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork; its check fails with a 404. Unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "eslint-plugin-oxlint",
@@ -121,6 +145,14 @@
       "packageManager": "pnpm",
       "monorepo": true,
       "notes": ""
+    },
+    {
+      "name": "evcc",
+      "upstream": "evcc-io/evcc",
+      "branch": "master",
+      "packageManager": "npm",
+      "monorepo": false,
+      "notes": "evcc. Go backend with a Vue frontend; only the frontend uses vite-plus (`vp dev`, `vp fmt`, `vp lint`). No committed packageManager field. `default.yml` runs on `pull_request` without secrets. No supply-chain gate in `.npmrc`."
     },
     {
       "name": "f3-app",
@@ -216,7 +248,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "project-side: `@stylexjs/unplugin` wants `unplugin ^2` while the repo installs 3.x. A regenerated lockfile makes this fatal under `strictPeerDependencies: true`; set it to false on the test branch."
     },
     {
       "name": "nostalgist",
@@ -235,12 +267,20 @@
       "notes": ""
     },
     {
+      "name": "npmx.dev",
+      "upstream": "npmx-dev/npmx.dev",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "The org copy is a detached fork (no GitHub parent), so `gh repo fork` cannot re-link it; the `source` remote must be added by hand."
+    },
+    {
       "name": "ohbug",
       "upstream": "ohbug-org/ohbug",
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "project-side: `@ohbug/unplugin`'s webpack entry pulls webpack/tapable and postcss CommonJS `.d.ts` files that rolldown-plugin-dts cannot bundle, so its `postinstall` build fails. Set `pack.dts: false` for that package on the test branch. Reproduces on older vite-plus releases."
     },
     {
       "name": "OneSignal-Website-SDK",
@@ -249,6 +289,14 @@
       "packageManager": "bun",
       "monorepo": false,
       "notes": ""
+    },
+    {
+      "name": "orval",
+      "upstream": "orval-labs/orval",
+      "branch": "master",
+      "packageManager": "bun",
+      "monorepo": true,
+      "notes": "Orval. Deepest `vp run` usage in the catalog (19 scripts) and one of the few bun projects. `pr-checks.yaml` runs on `pull_request` without secrets. `bunfig.toml` sets `minimumReleaseAge = 259200`, so bun rejects any fresh publish; set it to `0` on the test branch, because bun's `minimumReleaseAgeExcludes` does not accept the `@voidzero-dev/*` glob."
     },
     {
       "name": "oxc-playground",
@@ -264,7 +312,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "supply-chain gate: `pnpm-workspace.yaml` sets `trustPolicy: no-downgrade`, which rejects bridge preview builds because they carry no provenance. Add `trustPolicyExclude` for `vite-plus` and `@voidzero-dev/*` on the test branch."
     },
     {
       "name": "pdfme",
@@ -272,7 +320,7 @@
       "branch": "main",
       "packageManager": "npm",
       "monorepo": true,
-      "notes": ""
+      "notes": "supply-chain gate: `.npmrc` sets `min-release-age=3`, so npm rejects a fresh publish with `ETARGET`. Set `min-release-age=0` on the test branch."
     },
     {
       "name": "pinia-shared-state",
@@ -288,7 +336,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `cytoscape` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch."
     },
     {
       "name": "react-doctor",
@@ -296,7 +344,15 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `semver@6.3.1` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
+    },
+    {
+      "name": "react-hookz-web",
+      "upstream": "react-hookz/web",
+      "branch": "master",
+      "packageManager": "yarn",
+      "monorepo": false,
+      "notes": "The only yarn project in the catalog (yarn 4.x), so it is the sole cover for yarn install and migrate paths. The org fork is named `react-hookz-web`, because `web` is ambiguous. `ci.yml` runs on `pull_request` and its only secret is `CODECOV_TOKEN`; that upload failure counts as passing. No supply-chain gate."
     },
     {
       "name": "react-native-onesignal",
@@ -312,7 +368,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "no pull_request-triggered workflow of its own (only `release.yml` on tags), so a test PR reports \"no checks\". Add an `ecosystem-ci build` workflow running `vp run build` on the test branch; see \"Forks with no PR CI\" in TESTING.md."
+      "notes": "no pull_request-triggered workflow of its own (only `release.yml` on tags), so a test PR reports \"no checks\". Add `.github/workflows/ecosystem-ci-build.yml` running `vp check` and `vp build` on the test branch each release; see \"Forks with no PR CI\". Also needs `@types/node` and `\"node\"` in the tsconfig `types` array, because `vite.config.ts` uses `path`, `process`, and `import.meta.dirname` and `vp check` fails without them. Drop the added workflow once the repo runs these checks on pull requests itself."
     },
     {
       "name": "regle",
@@ -355,12 +411,19 @@
       "notes": "blocked: same `@janosh/vite-config` problem as matterviz. The package has no entry point, so `vite.config.ts` cannot load and no checks run."
     },
     {
+      "name": "tiptap",
+      "upstream": "ueberdosis/tiptap",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true
+    },
+    {
       "name": "trpc-nuxt",
       "upstream": "wobsoriano/trpc-nuxt",
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "typed-xlsx",
@@ -376,7 +439,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork; its check fails with a 404. Unrelated to vite-plus."
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork; its check fails with a 404. Unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "urllib",
@@ -384,7 +447,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise: the CodSpeedHQ/action step fails on the fork (installer hash pin mismatch and `401 Unauthorized` on upload) because the fork has no CodSpeed token. Unrelated to vite-plus."
+      "notes": "fork-CI noise: the CodSpeedHQ/action step fails on the fork (installer hash pin mismatch and `401 Unauthorized` on upload) because the fork has no CodSpeed token. Its CI also installs behind Socket Firewall (`sfw vp install`), which cannot reach `registry-bridge.viteplus.dev` and fails with `ERR_PNPM_META_FETCH_FAIL`; the bridge itself is healthy, and a real npm release resolves from registry.npmjs.org. Both are unrelated to vite-plus."
     },
     {
       "name": "v-offline",
@@ -400,7 +463,7 @@
       "branch": "dev",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "vibe-dashboard",
@@ -411,12 +474,28 @@
       "notes": ""
     },
     {
+      "name": "videojs-v10",
+      "upstream": "videojs/v10",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "Video.js v10. Scripts run the toolchain end to end: `vp config`, `vp run -r build`, `vp check`, `vp lint`, `vp fmt`, `vp test`. `pkg-pr-new.yml` needs the pkg-pr-new App, which this org does not install, so gate that job on the fork."
+    },
+    {
+      "name": "vinext",
+      "upstream": "cloudflare/vinext",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "`ci.yml` runs on `pull_request`, needs no secrets, and covers `vp run build`, `vp run check`, `vp run knip`, and sharded `vp test run` unit and integration suites. High-signal fork. Gate the `preview-release`, `release`, and `*-cloudflare-deploy` workflows, which need credentials the fork does not have."
+    },
+    {
       "name": "vitepress-carbon",
       "upstream": "brenoepics/vitepress-carbon",
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "pins `packageManager: pnpm@9.9.0`, which stalls forever at 0% CPU installing through the registry bridge. Bump the pin to the latest v9 on the test branch. Reproduces on older vite-plus releases, so it is not release-specific."
     },
     {
       "name": "vitepress-plugin-group-icons",
@@ -424,7 +503,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds. Add `trustPolicyExclude` for `vite-plus` and `@voidzero-dev/*` on the test branch. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "vue-clamp",
@@ -432,7 +511,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork (404), and the test job flakes on `ResizeObserver loop completed with undelivered notifications`. Both unrelated to vite-plus."
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork (404), and the test job flakes on `ResizeObserver loop completed with undelivered notifications`. Both unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
       "name": "vue-core",
@@ -463,14 +542,6 @@
       "upstream": "mountain-loop/yaak",
       "branch": "main",
       "packageManager": "npm",
-      "monorepo": true,
-      "notes": ""
-    },
-    {
-      "name": "zerobyte",
-      "upstream": "nicotsx/zerobyte",
-      "branch": "main",
-      "packageManager": "bun",
       "monorepo": true,
       "notes": ""
     }
