@@ -426,6 +426,22 @@
       "notes": ""
     },
     {
+      "name": "videojs-v10",
+      "upstream": "videojs/v10",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "Video.js v10. Scripts run the toolchain end to end: `vp config`, `vp run -r build`, `vp check`, `vp lint`, `vp fmt`, `vp test`. `pkg-pr-new.yml` needs the pkg-pr-new App, which this org does not install, so gate that job on the fork."
+    },
+    {
+      "name": "vinext",
+      "upstream": "cloudflare/vinext",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "`ci.yml` runs on `pull_request`, needs no secrets, and covers `vp run build`, `vp run check`, `vp run knip`, and sharded `vp test run` unit and integration suites. High-signal fork. Gate the `preview-release`, `release`, and `*-cloudflare-deploy` workflows, which need credentials the fork does not have."
+    },
+    {
       "name": "vitepress-carbon",
       "upstream": "brenoepics/vitepress-carbon",
       "branch": "main",

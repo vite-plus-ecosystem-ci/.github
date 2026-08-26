@@ -207,6 +207,26 @@ An upgrade failure has two marks: the prerelease does not resolve, build, or tes
 gh api repos/vite-plus-ecosystem-ci/$name/actions/jobs/<job-id>/logs
 ```
 
+### 5. Close the PRs when the release ships
+
+A smoke-test PR is disposable. It exists to produce one CI run against one preview build, and it is worthless once that build is superseded. Close every PR of the cycle after the release ships.
+
+Nobody did this for the first five cycles, and the org reached 310 open prerelease PRs, of which only 57 belonged to the current release. That backlog is not free. Each fork accumulates roughly five stale drafts, which buries the current PR in the fork's list, and every one of them re-runs its whole CI matrix whenever the tracked branch is force-synced.
+
+Close a cycle by its build SHA:
+
+```bash
+sha=<superseded-preview-sha>
+gh api graphql -f query='query($q:String!){search(query:$q,type:ISSUE,first:100){nodes{... on PullRequest{number repository{name}}}}}' \
+  -f q="org:vite-plus-ecosystem-ci is:pr is:open in:title $sha" \
+  --jq '.data.search.nodes[] | "\(.repository.name) \(.number)"' |
+while read -r name number; do
+  gh pr close "$number" --repo "vite-plus-ecosystem-ci/$name" --delete-branch
+done
+```
+
+`--delete-branch` matters as much as the close. The test branch is named for the preview SHA, so leaving it behind keeps a dead ref on the fork forever.
+
 ## Filtering irrelevant fork-CI failures
 
 Across the full catalog, most red checks say nothing about the release. Put every failure into one of the classes below before you make a conclusion. Then report the count for each cause. Do not report only "N failed". `ecosystem.json` records the known per-repo cases in `notes`, so read those first.
@@ -447,6 +467,7 @@ These repos are deliberately out of the catalog. Do not add one again before you
 | `mlx-node` (`huggingface/mlx-node`) | Both failing jobs are Rust jobs (`cargo test`, `-p mlx-core --test kquant_ggml_parity`), and they do not exercise vite-plus. Its JS surface is too small for the triage cost. |
 | `tech-interview-handbook` (`yangshun/tech-interview-handbook`) | This Docusaurus site fails its build with a webpack error, `ProgressPlugin ... does not match the API schema`, which is unrelated to vite-plus. It has no passing check to balance that failure. |
 | `zerobyte` (`nicotsx/zerobyte`) | It costs work every release and returns nothing. Its `bunfig.toml` sets `minimumReleaseAge = 259200`, so bun refuses any fresh publish and the upgrade needs a test-branch patch every time. Once past that, its own dependency set breaks: a regenerated lockfile pairs `@better-auth/api-key@1.6.27` with `@better-auth/core@1.7.1`, which no longer exports `getIp`, and that one skew fails `build`, `typecheck`, and seven test files. Its `lint` script also hardcodes `node ./node_modules/oxlint/bin/oxlint`, a path the vite-plus toolchain model does not create. No check is left that says anything about the release. |
+| `monorepo` (`zap-studio/monorepo`) | It does not use vite-plus. Its scripts call `oxlint`, `oxfmt`, `tsdown`, and `vitest` directly through `pnpm exec`, and no script runs `vp`. A version bump therefore changes nothing that its CI executes. Migrate it first if you want it in the catalog. |
 
 ### Checks that count as passing
 
@@ -487,6 +508,8 @@ comm -3 \
 ```
 
 Every right-only name must be either in the manifest or in "Excluded repos" with a reason. Anything else is an accidental gap: add it, or exclude it explicitly. Two names resolve to something benign and are worth knowing: `playground` is the real name of the `oxc-playground` entry (GitHub redirects the old name), and the excluded repos stay in the org on purpose.
+
+The gap is easy to underrate, so treat the check as a required step rather than a cleanup task. Skipping it in the v0.3.0 sweep hid three forks, and one of them was `cloudflare/vinext`: 8.6k stars, and its `package.json` drives the whole toolchain through `vp config`, `vp run`, `vp check`, `vp lint`, `vp fmt`, and `vp test`. The fork had sat unsynced for seven weeks and 292 commits, and no sweep had ever touched it, because nothing reads the org list. A missing manifest entry produces no error anywhere. It produces silence.
 
 ### Detached forks
 
