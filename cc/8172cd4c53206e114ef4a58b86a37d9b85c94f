@@ -1,0 +1,19 @@
+ecosystem.json
+  s_71a3b49c0bdf46::t_03c4b4ca8df985 37-44,53-60,101-108,149-156,293-300,349-356
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "cc8172cd4c53206e114ef4a58b86a37d9b85c94f",
+  "prompts": {},
+  "sessions": {
+    "s_71a3b49c0bdf46": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1129124-4b50-493c-a6b0-9bd30f8b1e4d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "MK <fengmk2@gmail.com>"
+    }
+  }
+}
