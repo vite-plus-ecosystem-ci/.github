@@ -452,6 +452,32 @@ Set the fields as follows.
 - **The CI install step.** Check how the project's CI installs dependencies, because a non-standard installer breaks the preview-build smoke test. `cnpmcore`'s CI installs with `utoo` (`ut`), which does not resolve `vite-plus@0.0.0-commit.<sha>` through the bridge `.npmrc`. Its smoke test therefore fails during dependency resolution. Record this in `notes`.
 - **`monorepo`.** Set this field when the project has a `workspaces` field, a `pnpm-workspace.yaml` file, or a `packages/` directory.
 
+### Find new candidates
+
+The catalog grows by chance otherwise, and it drifts toward whatever the last person happened to notice. Sweep for real consumers instead. Search code for the dependency and for `vp` in scripts, then verify each hit by reading its root `package.json`, because the legacy search engine tokenizes and returns many false positives:
+
+```bash
+for q in '"vite-plus" filename:package.json' '"vp check" filename:package.json' \
+         '"vp test" filename:package.json'  '"vp build" filename:package.json' \
+         '"vp lint" filename:package.json'  '"vp fmt" filename:package.json' \
+         '"vp config" filename:package.json' '"vite-plus" filename:pnpm-workspace.yaml' \
+         '"@voidzero-dev/vite-plus-core"'   '"voidzero-dev/setup-vp"'; do
+  gh search code "$q" --limit 100 --json repository --jq '.[].repository.nameWithOwner'
+  sleep 7   # code search allows 10 requests per minute
+done | tr 'A-Z' 'a-z' | sort -u
+```
+
+A repo qualifies when it declares a `vite-plus` dependency or runs `vp` in a script. Subtract `.repos[].upstream` and the excluded list from the result. The 2026-08-26 sweep returned 256 uncatalogued consumers, 28 of them at 1k+ stars, so expect the leftover set to stay large. Each query caps at 100 results, so the total is a lower bound.
+
+Rank what is left on four things, in this order:
+
+1. **Coverage the catalog lacks.** This beats star count. The same sweep found the catalog held 48 pnpm repos and not one yarn repo, so `vp migrate` and the yarn install path went untested every release. `react-hookz-web` was added for that reason alone.
+2. **A `pull_request` workflow that needs no secrets.** Without one the fork produces no signal. Read the `on:` block, then grep the file for `secrets.` and for `blacksmith` or `self-hosted` runners.
+3. **Depth of `vp` use.** Count the scripts that invoke `vp`. A repo with one `vp fmt` script tests almost nothing; `orval` has 19.
+4. **Star count**, last.
+
+Prefer a project pinned to the previous release, since it exercises a real upgrade. Only 8 of those 256 were on `0.2.9`, while 109 tracked `catalog:` and 33 tracked `latest`, so pinned-to-previous is scarce and worth keeping when you find it.
+
 ### Remove a repo
 
 Delete the entry of the repo from `ecosystem.json`. You can also delete the fork with `gh repo delete vite-plus-ecosystem-ci/<name>`, but the fork does no harm, and tooling reads only the manifest. Add a line to "Excluded repos" below. The next person then does not add the repo again and repeat the work.

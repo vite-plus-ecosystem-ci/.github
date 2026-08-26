@@ -35,12 +35,28 @@
       "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork, so its check fails with `Check failed (404): The app https://github.com/apps/pkg-pr-new is not installed`. Unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
     },
     {
+      "name": "BlockNote",
+      "upstream": "TypeCellOS/BlockNote",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "BlockNote. 15 `vp` scripts, mostly `vp run -r`. `build.yml` runs on `pull_request` without secrets. `minimumReleaseAge: 1440` is already excluded for `vite-plus` and `@voidzero-dev/*`, so no supply-chain patch is needed."
+    },
+    {
       "name": "brazilian-utils-javascript",
       "upstream": "brazilian-utils/javascript",
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": false,
       "notes": "fork-CI noise: the `Test on Deno` job fails on `expect(...).toHaveBeenCalledTimes is not a function`, a Deno test-environment issue independent of the vite-plus version."
+    },
+    {
+      "name": "cloudflare-os",
+      "upstream": "cloudflare/cloudflare-os",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "`ci.yml` runs on `pull_request` without secrets. `pnpm-workspace.yaml` sets `minimumReleaseAge: 1440` and its exclude list omits vite-plus, so add `vite-plus` and `@voidzero-dev/*` to `minimumReleaseAgeExclude` on the test branch. That gate keys off publish time, so it also rejects a real release on release day. Gate `preview.yml`, `bonk*.yml`, and `cla.yml`, which need credentials the fork lacks."
     },
     {
       "name": "codiff",
@@ -83,6 +99,14 @@
       "notes": "CI triggers on push only; PRs do not run CI unless the workflow adds a pull_request trigger"
     },
     {
+      "name": "dify",
+      "upstream": "langgenius/dify",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "Dify. Largest catalogued vite-plus consumer. `vp check`, `vp lint`, `vp config`, and `vp run` drive the TS side; `api/` is Python and does not. `main-ci.yml` runs on `pull_request` without secrets. `pnpm-workspace.yaml` sets `trustPolicy: no-downgrade` and its `trustPolicyExclude` does not list vite-plus, so add `vite-plus` and `@voidzero-dev/*` there on the test branch or the preview build is rejected. Its `minimumReleaseAgeExclude` already covers the toolchain. 36 workflows, so read the failing job rather than the first red check."
+    },
+    {
       "name": "digital-signature",
       "upstream": "Jisu-Woniu/digital-signature",
       "branch": "main",
@@ -121,6 +145,14 @@
       "packageManager": "pnpm",
       "monorepo": true,
       "notes": ""
+    },
+    {
+      "name": "evcc",
+      "upstream": "evcc-io/evcc",
+      "branch": "master",
+      "packageManager": "npm",
+      "monorepo": false,
+      "notes": "evcc. Go backend with a Vue frontend; only the frontend uses vite-plus (`vp dev`, `vp fmt`, `vp lint`). No committed packageManager field. `default.yml` runs on `pull_request` without secrets. No supply-chain gate in `.npmrc`."
     },
     {
       "name": "f3-app",
@@ -259,6 +291,14 @@
       "notes": ""
     },
     {
+      "name": "orval",
+      "upstream": "orval-labs/orval",
+      "branch": "master",
+      "packageManager": "bun",
+      "monorepo": true,
+      "notes": "Orval. Deepest `vp run` usage in the catalog (19 scripts) and one of the few bun projects. `pr-checks.yaml` runs on `pull_request` without secrets. `bunfig.toml` sets `minimumReleaseAge = 259200`, so bun rejects any fresh publish; set it to `0` on the test branch, because bun's `minimumReleaseAgeExcludes` does not accept the `@voidzero-dev/*` glob."
+    },
+    {
       "name": "oxc-playground",
       "upstream": "oxc-project/playground",
       "branch": "main",
@@ -305,6 +345,14 @@
       "packageManager": "pnpm",
       "monorepo": true,
       "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `semver@6.3.1` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
+    },
+    {
+      "name": "react-hookz-web",
+      "upstream": "react-hookz/web",
+      "branch": "master",
+      "packageManager": "yarn",
+      "monorepo": false,
+      "notes": "The only yarn project in the catalog (yarn 4.x), so it is the sole cover for yarn install and migrate paths. The org fork is named `react-hookz-web`, because `web` is ambiguous. `ci.yml` runs on `pull_request` and its only secret is `CODECOV_TOKEN`; that upload failure counts as passing. No supply-chain gate."
     },
     {
       "name": "react-native-onesignal",
