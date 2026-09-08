@@ -67,6 +67,14 @@
       "notes": "CI triggers on push only; PRs do not run CI unless the workflow adds a pull_request trigger"
     },
     {
+      "name": "Cookies-EU-banner",
+      "upstream": "Alex-D/Cookies-EU-banner",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "Pins vite-plus 0.3.0. CI runs vp run build, vp check, and browser tests on Ubuntu. Uses pnpm from devEngines.packageManager and Playwright browsers."
+    },
+    {
       "name": "critical",
       "upstream": "addyosmani/critical",
       "branch": "master",
