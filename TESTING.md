@@ -76,9 +76,13 @@ The script does the same steps from the manifest, for one repo or for all of the
 ```bash
 scripts/setup-local.sh <name>     # one repo
 scripts/setup-local.sh --all      # every repo in ecosystem.json
+scripts/sync-forks.sh <name>      # safely sync one fork base with upstream
+scripts/sync-forks.sh --all       # safely sync every fork base with upstream
 # cleanup after a release:
 rm -rf ~/git/github.com/vite-plus-ecosystem-ci
 ```
+
+Run `scripts/sync-forks.sh --check --all` for a no-push drift report. The sync command fast-forwards a fork only when its tracked branch has no fork-only commits. It reports `MANUAL` and does not change a divergent fork. Exit code `2` means that at least one selected fork still needs a sync or manual work.
 
 ### 2. Make sure Actions is enabled on the fork
 
@@ -127,25 +131,29 @@ A local `vp migrate` does not exercise the project's own CI. To do that, open a 
 
 ### 1. Sync from source, then branch
 
-Always start the test branch from the latest upstream code. Do not start it from the fork branch, which can be stale. First sync the tracked branch from the `source` remote. Then create the test branch from it:
+Always start the test branch from the latest upstream code. Do not start it from the fork branch, which can be stale. Run the safe sync command from the `.github` checkout. Then create the test branch from `source`:
 
 ```bash
 name=<name>; branch=<tracked-branch>; version=<vite-plus-prerelease>   # branch from ecosystem.json; version = the build under test
+scripts/sync-forks.sh "$name"
 cd ~/git/github.com/vite-plus-ecosystem-ci/$name
-git fetch source
 git switch -c "update-vite-plus-prerelease-test-$version" "source/$branch"
 ```
 
-**Fast-forward the fork's tracked branch to upstream first.** A branch off `source/$branch` is not sufficient. The PR uses the *fork's* branch as its base. If that base is stale, the PR contains every upstream commit since the last sync, and not only the upgrade. Sync the base before you open PRs. Skip any fork whose branch has commits that the upstream does not have. Do not overwrite such a branch.
+**Fast-forward the fork's tracked branch to upstream first.** A branch off `source/$branch` is not sufficient. The PR uses the *fork's* branch as its base. If that base is stale, the PR contains every upstream commit since the last sync, and not only the upgrade. Sync the base before you open PRs. The script skips any fork whose branch has commits that the upstream does not have. It never force-pushes a tracked branch.
+
+The script applies these checks before it pushes:
 
 ```bash
+git fetch origin "$branch"
+git fetch source "$branch"
 git rev-list --left-right --count "origin/$branch...source/$branch"   # left = fork-only commits; must be 0 to sync
 git push --no-verify origin "source/$branch:refs/heads/$branch"
 ```
 
-GitHub does not calculate the merge base again when the base branch moves. If you already opened a PR against a stale base, close that PR and open it again. This forces a new merge-base calculation. A draft PR stays a draft after you open it again.
+GitHub does not calculate the merge base again when the base branch moves. After a sync, the script prints `REOPEN` and lists matching open smoke-test PRs when `gh` is available. Close and reopen the current release PR. Close old release PRs and delete their branches. A reopened draft stays a draft.
 
-**Check the divergence again immediately before you open each PR.** Do not check it only at the start of the run. A full-catalog sweep takes hours. An active upstream can add more than 80 commits in that time. A fork that you synced at the start is therefore stale when its PR runs. A PR on a stale base differs from the release under test in two ways at the same time. You cannot then assign a cause to a failure.
+**Run `scripts/sync-forks.sh "$name"` immediately before you open each PR.** Do not check divergence only at the start of the run. A full-catalog sweep takes hours. An active upstream can add more than 80 commits in that time. A fork that you synced at the start can be stale when its PR runs. A PR on a stale base differs from the release under test in two ways at the same time. You cannot then assign a cause to a failure.
 
 Branch name convention (required): **`update-vite-plus-prerelease-test-{version}`**. The `{version}` value is the vite-plus prerelease under test. It is a preview build `0.0.0-commit.<sha>`, or a tagged prerelease such as `0.2.3-alpha.1`.
 
