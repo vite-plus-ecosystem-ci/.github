@@ -72,7 +72,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "Uses vp pack, vp test, and vp check. The pnpm version is declared in devEngines.packageManager. Its CI runs on pull_request."
+      "notes": "Uses vp pack, vp test, and vp check. The pnpm version is declared in devEngines.packageManager. Its CI runs on pull_request: vp run build, vp check, and Playwright browser tests on Ubuntu."
     },
     {
       "name": "critical",
