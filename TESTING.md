@@ -76,8 +76,20 @@ The script does the same steps from the manifest, for one repo or for all of the
 ```bash
 scripts/setup-local.sh <name>     # one repo
 scripts/setup-local.sh --all      # every repo in ecosystem.json
+scripts/sync-forks.sh <name>      # safely sync one fork base with upstream
+scripts/sync-forks.sh --all       # safely sync every fork base with upstream
 # cleanup after a release:
 rm -rf ~/git/github.com/vite-plus-ecosystem-ci
+```
+
+Run `scripts/sync-forks.sh --check --all` for a no-push drift report. The sync command fast-forwards a fork only when its tracked branch has no fork-only commits. It reports `MANUAL` and does not change a divergent fork. Exit code `2` means that at least one selected fork still needs a sync or manual work.
+
+Run these scripts from an up-to-date `main` of this repository. An old feature-branch checkout can lack a script or carry a stale manifest.
+
+**A `MANUAL` fork whose fork-only commit came from upstream.** Upstream sometimes rewrites history after a sync, so the fork keeps an upstream commit that upstream no longer has. Check that the commit is not one of our test fixes: look at its author and subject, and search this repository's history for it. If it carries no fork-specific change, ask the release manager before you reset the tracked branch to upstream:
+
+```bash
+git push --no-verify --force-with-lease="$branch:$(git rev-parse "origin/$branch")" origin "source/$branch:refs/heads/$branch"
 ```
 
 ### 2. Make sure Actions is enabled on the fork
@@ -109,6 +121,13 @@ Run the vite-plus harness against the local checkout. The `release-manager` skil
 .github/scripts/test-pkg-pr-new-migrate.sh <PR#> ~/git/github.com/vite-plus-ecosystem-ci/<name> --no-interactive
 ```
 
+Four local problems look like vite-plus failures and are not:
+
+- **TLS inspection.** A corporate zero-trust client can re-sign `registry-bridge.viteplus.dev` with a root that the OS trusts but Node does not. Every bridge fetch then fails with `ERR_PNPM_META_FETCH_FAIL ... fetch failed`, while `curl` works. `node -e "fetch('https://registry-bridge.viteplus.dev/vite-plus')"` shows `SELF_SIGNED_CERT_IN_CHAIN`. Export that root certificate and set `NODE_EXTRA_CA_CERTS` for the harness and every control run.
+- **Parallel runs.** Concurrent installs that share one pnpm store can stall at 0% CPU while one process holds the store's `index.db`. Rerun the stuck project alone before you call it a hang.
+- **Bundled npm.** The final install in `vp migrate` uses the Node that the global CLI manages. On Node 22.18 that is npm 10.9, which fails on some `$name` overrides (`Unable to resolve reference $name`) that npm 11 and later resolve. The npm debug log names the npm version that ran.
+- **The harness's environment lines.** The `vp --version` output that the harness prints describes the directory you launched it from, not the project.
+
 **How to choose a target.** Select a fork whose stack matches the risk area of the release. Query `ecosystem.json`:
 
 ```bash
@@ -127,25 +146,29 @@ A local `vp migrate` does not exercise the project's own CI. To do that, open a 
 
 ### 1. Sync from source, then branch
 
-Always start the test branch from the latest upstream code. Do not start it from the fork branch, which can be stale. First sync the tracked branch from the `source` remote. Then create the test branch from it:
+Always start the test branch from the latest upstream code. Do not start it from the fork branch, which can be stale. Run the safe sync command from the `.github` checkout. Then create the test branch from `source`:
 
 ```bash
 name=<name>; branch=<tracked-branch>; version=<vite-plus-prerelease>   # branch from ecosystem.json; version = the build under test
+scripts/sync-forks.sh "$name"
 cd ~/git/github.com/vite-plus-ecosystem-ci/$name
-git fetch source
 git switch -c "update-vite-plus-prerelease-test-$version" "source/$branch"
 ```
 
-**Fast-forward the fork's tracked branch to upstream first.** A branch off `source/$branch` is not sufficient. The PR uses the *fork's* branch as its base. If that base is stale, the PR contains every upstream commit since the last sync, and not only the upgrade. Sync the base before you open PRs. Skip any fork whose branch has commits that the upstream does not have. Do not overwrite such a branch.
+**Fast-forward the fork's tracked branch to upstream first.** A branch off `source/$branch` is not sufficient. The PR uses the *fork's* branch as its base. If that base is stale, the PR contains every upstream commit since the last sync, and not only the upgrade. Sync the base before you open PRs. The script skips any fork whose branch has commits that the upstream does not have. It never force-pushes a tracked branch.
+
+The script applies these checks before it pushes:
 
 ```bash
+git fetch origin "$branch"
+git fetch source "$branch"
 git rev-list --left-right --count "origin/$branch...source/$branch"   # left = fork-only commits; must be 0 to sync
 git push --no-verify origin "source/$branch:refs/heads/$branch"
 ```
 
-GitHub does not calculate the merge base again when the base branch moves. If you already opened a PR against a stale base, close that PR and open it again. This forces a new merge-base calculation. A draft PR stays a draft after you open it again.
+GitHub does not calculate the merge base again when the base branch moves. After a sync, the script prints `REOPEN` and lists matching open smoke-test PRs when `gh` is available. Close and reopen the current release PR. Close old release PRs and delete their branches. A reopened draft stays a draft.
 
-**Check the divergence again immediately before you open each PR.** Do not check it only at the start of the run. A full-catalog sweep takes hours. An active upstream can add more than 80 commits in that time. A fork that you synced at the start is therefore stale when its PR runs. A PR on a stale base differs from the release under test in two ways at the same time. You cannot then assign a cause to a failure.
+**Run `scripts/sync-forks.sh "$name"` immediately before you open each PR.** Do not check divergence only at the start of the run. A full-catalog sweep takes hours. An active upstream can add more than 80 commits in that time. A fork that you synced at the start can be stale when its PR runs. A PR on a stale base differs from the release under test in two ways at the same time. You cannot then assign a cause to a failure.
 
 Branch name convention (required): **`update-vite-plus-prerelease-test-{version}`**. The `{version}` value is the vite-plus prerelease under test. It is a preview build `0.0.0-commit.<sha>`, or a tagged prerelease such as `0.2.3-alpha.1`.
 
@@ -227,6 +250,16 @@ done
 
 `--delete-branch` matters as much as the close. The test branch is named for the preview SHA, so leaving it behind keeps a dead ref on the fork forever.
 
+Closing does not lose the test-branch fixes. Each closed PR's commits stay reachable at `refs/pull/<N>/head`. Before the next sweep, re-apply the previous cycle's fixes (supply-chain exemptions, runner-label maps, added workflows) to the new test branch:
+
+```bash
+git fetch origin "refs/pull/$number/head"
+git log --oneline FETCH_HEAD --not "source/$branch"   # skip the upgrade commit itself
+git cherry-pick <fix-commit>
+```
+
+Re-apply a fix by hand when upstream changes make the cherry-pick conflict.
+
 ## Filtering irrelevant fork-CI failures
 
 Across the full catalog, most red checks say nothing about the release. Put every failure into one of the classes below before you make a conclusion. Then report the count for each cause. Do not report only "N failed". `ecosystem.json` records the known per-repo cases in `notes`, so read those first.
@@ -266,6 +299,11 @@ Only `False` shows a publishing problem. Always search the install step for `err
 - `ERR_PNPM_TARBALL_URL_MISMATCH`, or a failed supply-chain policy check against the bridge tarball URLs
 - `ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION`, when a project declares `vite` as a peer dependency
 - a Docker build whose context does not contain the bridge `.npmrc`
+- two `vite-plus` versions in `pnpm why`: the prerelease does not match `*`, so a package with an optional `vite-plus: '*'` peer (oxlint, oxfmt) can keep a stale `vite-plus` from the old lockfile
+- a project check that queries `vite@*` or `vite-plus@*` and finds nothing, such as a phantom-override check
+- npm 10 `Unable to resolve reference $vite-plus` on a nested `overrides` entry
+
+Confirm the last three by swapping the commit version for a real release in a scratch copy, or with the previous-release control.
 
 **3. Fork infrastructure.** The fork is not the upstream repo, so it does not have the secrets and app installations of the upstream. The recurring cases are:
 
@@ -373,8 +411,19 @@ A self-hosted or third-party runner label resolves only for the upstream org. On
 | `blacksmith-32vcpu-ubuntu-2404-arm` | `ubuntu-24.04-arm` |
 | `blacksmith-32vcpu-windows-2025` | `windows-2025` |
 | `blacksmith-12vcpu-macos-15` | `macos-15` |
+| `blacksmith-6vcpu-macos-latest` | `macos-latest` |
+| `depot-ubuntu-24.04-arm-32` | `ubuntu-24.04-arm` |
+| `depot-ubuntu-24.04-arm` | `ubuntu-24.04-arm` |
+| `depot-ubuntu-24.04-4` | `ubuntu-24.04` |
+| `depot-ubuntu-24.04` | `ubuntu-24.04` |
+| `namespace-profile-<name>-linux-amd64` | `ubuntu-latest` |
+| `namespace-profile-<name>-windows-amd64` | `windows-latest` |
 
-Replace the longest label first. Replace the `-arm` label before the plain label, so that no partly rewritten string remains. Runner-specific **actions** need more work than a label change, and that work is usually not worth the cost. Examples are `useblacksmith/begin-testbox`, `useblacksmith/run-testbox`, and cache actions of the same provider. Leave those jobs in the failed state, and record them in `notes`.
+Replace the longest label first. Replace the `-arm` label before the plain label, so that no partly rewritten string remains. Runner-specific **actions** need more work than a label change, and that work is usually not worth the cost. Examples are `useblacksmith/begin-testbox`, `useblacksmith/run-testbox`, and cache actions of the same provider. Leave those jobs in the failed state, and record them in `notes`. One exception: `namespacelabs/nscloud-checkout-action` takes the same inputs as `actions/checkout`, so replace it.
+
+GitHub-hosted runners are smaller than most third-party runners. Heavy test suites can then time out, and tests that derive thread counts from the CPU count can fail. Classify those as fork infrastructure.
+
+A `pull_request_target` workflow, such as a labeler, runs the definition from the base branch, so a label change on the test branch does not reach it. Ignore those queued jobs.
 
 ### Supply-chain gates that reject the preview build
 
@@ -393,6 +442,7 @@ Three details that cost time if you do not know them:
 - **`trustPolicy` also fires on unrelated third-party packages.** pnpm compares every earlier-published version across **all** majors, so a package whose other major line has provenance trips the check ([pnpm/pnpm#10202](https://github.com/pnpm/pnpm/issues/10202)). `semver@6.3.1` and `cytoscape@3.34.1` are confirmed cases. A regenerated lockfile is what exposes them. Add the offending name to `trustPolicyExclude` too, with a comment pointing at the upstream issue.
 - **Glob support differs between the two pnpm settings and bun.** `@voidzero-dev/*` matches in pnpm's `trustPolicyExclude` and `minimumReleaseAgeExclude`. It does **not** match in bun's `minimumReleaseAgeExcludes`; only exact names work there, so set `minimumReleaseAge = 0` rather than listing every platform package.
 - **A release-age gate is not purely a preview-build artifact.** `trustPolicy` is, because real releases are published with provenance and bridge builds are not. A release-age gate keys off publish time, so it rejects a *real* `vite-plus@X.Y.Z` on release day too and only clears a few days later. Say which of the two you are looking at when you report it.
+- **Fresh packages that Vite+ pins trip release-age gates too.** Core pins exact versions of packages such as `@oxc-project/runtime` and `@oxc-project/types`. When those were published inside the project's window, add `@oxc-project/*` (or the named package) to `minimumReleaseAgeExclude`. This is the project's policy, not a vite-plus bug, and it also affects the real release until the packages age.
 
 ### Forks pinning an old pnpm
 
@@ -416,11 +466,14 @@ A vite-plus release that bumps oxlint makes new rules fire on code that passed b
 
 Step 3 is legitimate rather than a cop-out when the project opts whole categories (`style`, `pedantic`, `restriction`, `nursery`) into `error` and then disables individual rules it disagrees with. That config shape is common, and adding one more entry follows the project's own intent. Check whether it already disables sibling rules such as `sort-imports` and `sort-keys`.
 
-Three traps:
+Traps:
 
 - **A `rules` key added after a spread replaces the whole inherited map.** With `lint: { ...config.lint, rules: { ... } }` you silently drop every rule the shared config disabled; one project went from 5 errors to over 2600. Always spread first: `rules: { ...config.lint?.rules, 'my-rule': 'off' }`.
 - **Ignore errors that only exist locally.** `Cannot find module '../../dist/...'`, an unbuilt workspace package, or an ungenerated Prisma client are artifacts of not having run the project's build. CI builds first and never sees them. Do not chase them.
 - **Re-lint and re-test after every code fix, and baseline the failures.** Dropping an unused `test.each` callback parameter breaks the callback's arity and produces fresh type errors. Before blaming your edit for a failing test, stash your changes and rerun: several of these projects have pre-existing failures.
+- **A disable comment above a multi-line type assertion stops working.** Since oxlint-tsgolint 7.0.2002, `typescript/no-unsafe-type-assertion` reports on the `} as T` line, and oxlint matches `oxlint-disable-next-line` against that line ([oxc-project/oxc#27084](https://github.com/oxc-project/oxc/issues/27084)). Move the comment to the line before `} as T`, or wrap the statement in an `oxlint-disable` / `oxlint-enable` block. With `reportUnusedDisableDirectives`, the old comment also becomes an unused-directive error.
+- **Keys that migrate inserts can break sort rules.** `sort-keys` and perfectionist `sort-objects` flag the keys migrate adds to `vite.config.ts`. `vp lint --fix` reorders them.
+- **Rules that key on `vitest` imports go quiet.** After migrate rewrites `vitest` imports to `vite-plus/test`, third-party rules that match the `vitest` import stop firing, and their disable comments become unused.
 
 ## CI caveats
 

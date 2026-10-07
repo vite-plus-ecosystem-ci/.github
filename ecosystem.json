@@ -24,7 +24,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "`JavaScript / Test` runs `vp dlx playwright install`, which installs the latest Playwright browsers rather than the version the project pins, so the browser executable is missing. Not caused by vite-plus."
     },
     {
       "name": "bippy",
@@ -32,7 +32,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork, so its check fails with `Check failed (404): The app https://github.com/apps/pkg-pr-new is not installed`. Unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
+      "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork, so its check fails with `Check failed (404): The app https://github.com/apps/pkg-pr-new is not installed`. Unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\". `e2e-web` (Playwright) fails in recent cycles (not investigated)."
     },
     {
       "name": "BlockNote",
@@ -40,7 +40,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "BlockNote. 15 `vp` scripts, mostly `vp run -r`. `build.yml` runs on `pull_request` without secrets. `minimumReleaseAge: 1440` is already excluded for `vite-plus` and `@voidzero-dev/*`, so no supply-chain patch is needed."
+      "notes": "BlockNote. 15 `vp` scripts, mostly `vp run -r`. `build.yml` runs on `pull_request` without secrets. `minimumReleaseAge: 1440` is already excluded for `vite-plus` and `@voidzero-dev/*`, so no supply-chain patch is needed. E2E jobs fail across browsers in recent cycles (not investigated)."
     },
     {
       "name": "brazilian-utils-javascript",
@@ -48,7 +48,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": false,
-      "notes": "fork-CI noise: the `Test on Deno` job fails on `expect(...).toHaveBeenCalledTimes is not a function`, a Deno test-environment issue independent of the vite-plus version."
+      "notes": "fork-CI noise: the `Test on Deno` job fails on `expect(...).toHaveBeenCalledTimes is not a function`, a Deno test-environment issue independent of the vite-plus version. `vp migrate` stops on the Vitest v5 `benchmark-api` block (bench references need manual migration), on v1.0.0 too."
     },
     {
       "name": "cloudflare-os",
@@ -56,7 +56,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "`ci.yml` runs on `pull_request` without secrets. `pnpm-workspace.yaml` sets `minimumReleaseAge: 1440` and its exclude list omits vite-plus, so add `vite-plus` and `@voidzero-dev/*` to `minimumReleaseAgeExclude` on the test branch. That gate keys off publish time, so it also rejects a real release on release day. Gate `preview.yml`, `bonk*.yml`, and `cla.yml`, which need credentials the fork lacks."
+      "notes": "`ci.yml` runs on `pull_request` without secrets. `pnpm-workspace.yaml` sets `minimumReleaseAge: 1440` and its exclude list omits vite-plus, so add `vite-plus` and `@voidzero-dev/*` to `minimumReleaseAgeExclude` on the test branch. That gate keys off publish time, so it also rejects a real release on release day. Gate `preview.yml`, `bonk*.yml`, and `cla.yml`, which need credentials the fork lacks. `Build and test` runs `pnpm exec vite build`, which fails after migration because the `vite` alias to vite-plus-core has no bin. `CLAssistant` and `bonk` fail on the fork. Migrate's oxfmt reformat joins multi-line string concatenations, which trips `no-useless-concat`."
     },
     {
       "name": "codiff",
@@ -72,7 +72,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "Pins vite-plus 0.3.0. CI runs vp run build, vp check, and browser tests on Ubuntu. Uses pnpm from devEngines.packageManager and Playwright browsers."
+      "notes": "Uses vp pack, vp test, and vp check. The pnpm version is declared in devEngines.packageManager. Its CI runs on pull_request: vp run build, vp check, and Playwright browser tests on Ubuntu."
     },
     {
       "name": "critical",
@@ -96,7 +96,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "`minimumReleaseAge: 4320`. Add `@oxc-project/*` to `minimumReleaseAgeExclude` when Vite+ pins freshly published oxc packages; migrate adds the other Vite+ packages itself."
     },
     {
       "name": "delta-comic",
@@ -112,7 +112,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "Dify. Largest catalogued vite-plus consumer. `vp check`, `vp lint`, `vp config`, and `vp run` drive the TS side; `api/` is Python and does not. `main-ci.yml` runs on `pull_request` without secrets. `pnpm-workspace.yaml` sets `trustPolicy: no-downgrade` and its `trustPolicyExclude` does not list vite-plus, so add `vite-plus` and `@voidzero-dev/*` there on the test branch or the preview build is rejected. Its `minimumReleaseAgeExclude` already covers the toolchain. 36 workflows, so read the failing job rather than the first red check."
+      "notes": "Dify. Largest catalogued vite-plus consumer. `vp check`, `vp lint`, `vp config`, and `vp run` drive the TS side; `api/` is Python and does not. `main-ci.yml` runs on `pull_request` without secrets. `pnpm-workspace.yaml` sets `trustPolicy: no-downgrade` and its `trustPolicyExclude` does not list vite-plus, so add `vite-plus` and `@voidzero-dev/*` there on the test branch or the preview build is rejected. Its `minimumReleaseAgeExclude` already covers the toolchain. 36 workflows, so read the failing job rather than the first red check. Workflows target `depot-ubuntu-24.04` and `depot-ubuntu-24.04-4`; map both to `ubuntu-24.04` on the test branch. On GitHub-hosted runners a few heavy web specs time out at 5s. The `labeler` workflow is `pull_request_target`, so it stays queued on the base branch's Depot label."
     },
     {
       "name": "digital-signature",
@@ -128,7 +128,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise is limited to jobs the fork cannot run: the `build (*)` Docker image jobs need registry credentials (`Password required`) and `format` needs a token (`Input required and not supplied: token`). The `test` job is the real signal and does pass; if it fails with `Cannot find native binding`, that is the bridge flake, so re-run it."
+      "notes": "fork-CI noise is limited to jobs the fork cannot run: the `build (*)` Docker image jobs need registry credentials (`Password required`) and `format` needs a token (`Input required and not supplied: token`). The `test` job is the real signal and does pass; if it fails with `Cannot find native binding`, that is the bridge flake, so re-run it. Did not use vite-plus before migration. Package `build` scripts run `vp pack --config ../../tsdown.config.ts`, which treats the config path as an entry and fails in the dts plugin (identical on v1.0.0)."
     },
     {
       "name": "dotabod-frontend",
@@ -136,7 +136,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "Did not use vite-plus before migration. `vp migrate` ignores the project's `oxfmt.config.ts` and writes `fmt: {}`; point `fmt` at that config before formatting. The lint step is an oxlint baseline ratchet that pins `oxlintVersion`, so re-bootstrap the baseline with the project's `--bootstrap` flow after each oxlint bump. Register `oxlint.deno.config.ts` as a knip entry after migration."
     },
     {
       "name": "elysia-clerk",
@@ -160,7 +160,7 @@
       "branch": "master",
       "packageManager": "npm",
       "monorepo": false,
-      "notes": "evcc. Go backend with a Vue frontend; only the frontend uses vite-plus (`vp dev`, `vp fmt`, `vp lint`). No committed packageManager field. `default.yml` runs on `pull_request` without secrets. No supply-chain gate in `.npmrc`."
+      "notes": "evcc. Go backend with a Vue frontend; only the frontend uses vite-plus (`vp dev`, `vp fmt`, `vp lint`). No committed packageManager field. `default.yml` runs on `pull_request` without secrets. No supply-chain gate in `.npmrc`. Workflows target `depot-ubuntu-24.04-arm` and `depot-ubuntu-24.04-arm-32`; map both to `ubuntu-24.04-arm`. Locally, Node 22.18's npm 10 fails on the `storybook` override `\"vite-plus\": \"$vite-plus\"` with a preview build; regenerate the lockfile with npm 11 or later."
     },
     {
       "name": "f3-app",
@@ -184,7 +184,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "project-side: `example/server-graphql/scripts/generate-graphql.tsx` imports `oxfmt` without declaring it, so it only resolves through hoisting. Fails with `Cannot find package 'oxfmt'` whenever the lockfile is regenerated. Unrelated to vite-plus."
+      "notes": "project-side: `example/server-graphql/scripts/generate-graphql.tsx` imports `oxfmt` without declaring it, so it only resolves through hoisting. Fails with `Cannot find package 'oxfmt'` whenever the lockfile is regenerated. Unrelated to vite-plus. `vp migrate` stops on the Vitest v5 `benchmark-api` block (a bench call needs manual migration), on v1.0.0 too."
     },
     {
       "name": "freecut",
@@ -192,7 +192,7 @@
       "branch": "main",
       "packageManager": "npm",
       "monorepo": false,
-      "notes": ""
+      "notes": "Vitest 5 type-checking needs `import '@testing-library/jest-dom/vitest'` in `src/test/setup.ts`; the default jest-dom entry leaves about 1200 `TS2339` errors in `vp check`."
     },
     {
       "name": "gitify",
@@ -216,7 +216,7 @@
       "branch": "main",
       "packageManager": "npm",
       "monorepo": true,
-      "notes": "fork-CI noise: the `check-label` job requires every PR to carry a `changelog:***` label, so ecosystem-ci test PRs always fail it. The `lint-build` job also runs project meta-checks (`knip`, `check-overrides`) that fail whenever dependencies change. Unrelated to vite-plus."
+      "notes": "fork-CI noise: the `check-label` job requires every PR to carry a `changelog:***` label, so ecosystem-ci test PRs always fail it. The `lint-build` job also runs project meta-checks (`knip`, `check-overrides`) that fail whenever dependencies change. Unrelated to vite-plus. With a preview build, `check-overrides` reports a phantom `vite@*` override because the prerelease version does not match `*`; a real release does not."
     },
     {
       "name": "koel",
@@ -232,7 +232,7 @@
       "branch": "main",
       "packageManager": "node",
       "monorepo": false,
-      "notes": "blocked: `@janosh/vite-config` resolves to a package with no `main`/`module`/`exports`, so loading `vite.config.ts` fails with `Failed to resolve entry for package \"@janosh/vite-config\"`. No vite-plus version can run here until the dependency is fixed."
+      "notes": "`vite.config.ts` now imports `svelte-widgets/vite-config`, so the earlier `@janosh/vite-config` blocker no longer applies. The base branch commits no lockfile. Its CI setup action installs each `extensions/*` package with `pnpm install --no-lockfile` in a standalone workspace, which cannot resolve the `catalog:` specs that migrate writes (`ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC`), so every job fails at install."
     },
     {
       "name": "mcp-omnisearch",
@@ -240,7 +240,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "preview-build limitation: the Docker build context does not carry the bridge `.npmrc`, so `pnpm install --frozen-lockfile` inside the image rejects the commit-build tarball URLs with `ERR_PNPM_TARBALL_URL_MISMATCH`. Cannot happen for a real npm release."
+      "notes": "preview-build limitation: the Docker build context does not carry the bridge `.npmrc`, so `pnpm install --frozen-lockfile` inside the image rejects the commit-build tarball URLs with `ERR_PNPM_TARBALL_URL_MISMATCH`. Cannot happen for a real npm release. `minimumReleaseAge: 2880`; add `@oxc-project/*` to `minimumReleaseAgeExclude` when Vite+ pins freshly published oxc packages."
     },
     {
       "name": "media-processors",
@@ -256,7 +256,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "project-side: `@stylexjs/unplugin` wants `unplugin ^2` while the repo installs 3.x. A regenerated lockfile makes this fatal under `strictPeerDependencies: true`; set it to false on the test branch."
+      "notes": "project-side: `@stylexjs/unplugin` wants `unplugin ^2` while the repo installs 3.x. A regenerated lockfile makes this fatal under `strictPeerDependencies: true`; set it to false on the test branch. `binaries (macos-14)` fails at codesigning because the fork has no signing secrets."
     },
     {
       "name": "nostalgist",
@@ -280,7 +280,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "The org copy is a detached fork (no GitHub parent), so `gh repo fork` cannot re-link it; the `source` remote must be added by hand."
+      "notes": "The org copy is a detached fork (no GitHub parent), so `gh repo fork` cannot re-link it; the `source` remote must be added by hand. `Component tests` has failed since the 1.0.0-rc.1 cycle: 45 a11y tests reject a `@vue/compiler-core` `decodeEntities` warning in Vitest 5 browser mode. See why-reproductions-are-required/vitest-vue-compiler-decode-entities."
     },
     {
       "name": "ohbug",
@@ -296,7 +296,7 @@
       "branch": "main",
       "packageManager": "bun",
       "monorepo": false,
-      "notes": ""
+      "notes": "Vitest 5.0.3's `spyOn` overload makes two `@ts-expect-error` comments in `src/page/bell/Bell.test.ts` unused (`TS2578`); remove them on the test branch."
     },
     {
       "name": "orval",
@@ -344,7 +344,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `cytoscape` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch."
+      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `cytoscape` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch. Workflows target `namespace-profile-rari-linux-amd64` and `namespace-profile-rari-windows-amd64` (map to `ubuntu-latest` and `windows-latest`) and use `namespacelabs/nscloud-checkout-action` (replace with `actions/checkout`). `Run benchmarks` needs a CodSpeed token. `minimumReleaseAgeExclude` also needs `vite-plus`, `@voidzero-dev/*`, and `@oxc-project/*` when Vite+ pins fresh oxc packages."
     },
     {
       "name": "react-doctor",
@@ -352,7 +352,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `semver@6.3.1` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
+      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `semver@6.3.1` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\". `vp migrate` removes `oxfmt` from `packages/oxlint-plugin-react-doctor` (a script imports it) and the pinned runtime `oxlint` dependency from `packages/core` and `packages/react-doctor`; restore both on the test branch. `ci.yml` targets `blacksmith-6vcpu-macos-latest`; on `macos-latest` (3 vCPU) the worker-pool test fails. The Node 20 test job cannot pass because vite-plus requires Node 22.18 or later. `Record interactive CLI` fails every cycle: `ni --global` adds to the migrated catalog, then hits `ERR_PNPM_OUTDATED_LOCKFILE`."
     },
     {
       "name": "react-hookz-web",
@@ -400,7 +400,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "`prepare` runs `@effect/tsgo`, which refuses oxlint binding versions it does not know (`UnsupportedTargetPackageVersionError`). Bump `@effect/tsgo` with each oxlint upgrade; 0.49.0 is the first release that supports oxlint 1.87."
     },
     {
       "name": "solid-services",
@@ -416,7 +416,7 @@
       "branch": "main",
       "packageManager": "node",
       "monorepo": false,
-      "notes": "blocked: same `@janosh/vite-config` problem as matterviz. The package has no entry point, so `vite.config.ts` cannot load and no checks run."
+      "notes": "`vite.config.ts` now imports a local `src/lib/vite-config.ts`, so the earlier `@janosh/vite-config` blocker no longer applies; CI check, build, unit, and e2e pass. The base branch commits no lockfile, so never commit one. Locally, Node 22.18's bundled npm 10 cannot resolve the `\"svelte\": \"$svelte\"` override (`Unable to resolve reference $svelte`); CI uses Node 24 and npm 11."
     },
     {
       "name": "tiptap",
@@ -455,7 +455,7 @@
       "branch": "master",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "fork-CI noise: the CodSpeedHQ/action step fails on the fork (installer hash pin mismatch and `401 Unauthorized` on upload) because the fork has no CodSpeed token. Its CI also installs behind Socket Firewall (`sfw vp install`), which cannot reach `registry-bridge.viteplus.dev` and fails with `ERR_PNPM_META_FETCH_FAIL`; the bridge itself is healthy, and a real npm release resolves from registry.npmjs.org. Both are unrelated to vite-plus."
+      "notes": "fork-CI noise: the CodSpeedHQ/action step fails on the fork (installer hash pin mismatch and `401 Unauthorized` on upload) because the fork has no CodSpeed token. Its CI also installs behind Socket Firewall (`sfw vp install`), which cannot reach `registry-bridge.viteplus.dev` and fails with `ERR_PNPM_META_FETCH_FAIL`; the bridge itself is healthy, and a real npm release resolves from registry.npmjs.org. Both are unrelated to vite-plus. `vp dedupe --check` fails after migrate regenerates the lockfile."
     },
     {
       "name": "v-offline",
@@ -463,7 +463,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": ""
+      "notes": "`Validate branch name` requires `type/name` branches, so push the test branch as `test/vite-plus-prerelease-<sha>` and open the PR from it. The `Vue Doctor` job then runs and fails to load `unplugin-vue/rolldown` from `vite.config.ts` (not yet investigated)."
     },
     {
       "name": "varlet",
@@ -487,7 +487,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "Video.js v10. Scripts run the toolchain end to end: `vp config`, `vp run -r build`, `vp check`, `vp lint`, `vp fmt`, `vp test`. `pkg-pr-new.yml` needs the pkg-pr-new App, which this org does not install, so gate that job on the fork."
+      "notes": "Video.js v10. Scripts run the toolchain end to end: `vp config`, `vp run -r build`, `vp check`, `vp lint`, `vp fmt`, `vp test`. `pkg-pr-new.yml` needs the pkg-pr-new App, which this org does not install, so gate that job on the fork. `vp migrate` removes `oxfmt` from `packages/skins` devDependencies, but `build/registry/format.ts` imports it; restore `oxfmt` there on the test branch. `compatibility` needs BrowserStack secrets."
     },
     {
       "name": "vinext",
@@ -495,7 +495,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "`ci.yml` runs on `pull_request`, needs no secrets, and covers `vp run build`, `vp run check`, `vp run knip`, and sharded `vp test run` unit and integration suites. High-signal fork. Gate the `preview-release`, `release`, and `*-cloudflare-deploy` workflows, which need credentials the fork does not have."
+      "notes": "`ci.yml` runs on `pull_request`, needs no secrets, and covers `vp run build`, `vp run check`, `vp run knip`, and sharded `vp test run` unit and integration suites. High-signal fork. Gate the `preview-release`, `release`, and `*-cloudflare-deploy` workflows, which need credentials the fork does not have. `tests/init-cf-build.test.ts` spawns the generated app's `node_modules/.bin/vite preview`, which does not exist after migration because vite-plus-core has no `vite` bin, so 5 unit tests fail."
     },
     {
       "name": "vitepress-carbon",
@@ -503,7 +503,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "pins `packageManager: pnpm@9.9.0`, which stalls forever at 0% CPU installing through the registry bridge. Bump the pin to the latest v9 on the test branch. Reproduces on older vite-plus releases, so it is not release-specific."
+      "notes": "pins `packageManager: pnpm@9.9.0`, which stalls forever at 0% CPU installing through the registry bridge. Bump the pin to the latest v9 on the test branch. Reproduces on older vite-plus releases, so it is not release-specific. E2E fails (16 tests) after the multi-release jump from vite-plus 0.1.24 (not investigated)."
     },
     {
       "name": "vitepress-plugin-group-icons",
