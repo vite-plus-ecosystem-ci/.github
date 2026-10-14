@@ -35,14 +35,6 @@
       "notes": "fork-CI noise: the pkg-pr-new GitHub App is not installed on the fork, so its check fails with `Check failed (404): The app https://github.com/apps/pkg-pr-new is not installed`. Unrelated to vite-plus. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\". `e2e-web` (Playwright) fails in recent cycles (not investigated). Its HMR spec runs `vite/bin/vite.js`, which the core alias does not have; use `vite-plus/bin/vp dev`. The `@refresh reset` HMR test fails on Vite 8 because its Oxc refresh transform drops the flag (same on v1.1.0)."
     },
     {
-      "name": "BlockNote",
-      "upstream": "TypeCellOS/BlockNote",
-      "branch": "main",
-      "packageManager": "pnpm",
-      "monorepo": true,
-      "notes": "BlockNote. 15 `vp` scripts, mostly `vp run -r`. `build.yml` runs on `pull_request` without secrets. `minimumReleaseAge: 1440` is already excluded for `vite-plus` and `@voidzero-dev/*`, so no supply-chain patch is needed. E2E jobs fail across browsers in recent cycles (not investigated). GitHub disabled Actions on this fork (dispatch fails with `Actions has been disabled for this repository`); run check, build, and package tests locally. One package test needs `mkcert`."
-    },
-    {
       "name": "brazilian-utils-javascript",
       "upstream": "brazilian-utils/javascript",
       "branch": "main",
@@ -105,14 +97,6 @@
       "packageManager": "pnpm",
       "monorepo": true,
       "notes": "CI triggers on push only; PRs do not run CI unless the workflow adds a pull_request trigger"
-    },
-    {
-      "name": "dify",
-      "upstream": "langgenius/dify",
-      "branch": "main",
-      "packageManager": "pnpm",
-      "monorepo": true,
-      "notes": "Dify. Largest catalogued vite-plus consumer. `vp check`, `vp lint`, `vp config`, and `vp run` drive the TS side; `api/` is Python and does not. `main-ci.yml` runs on `pull_request` without secrets. `pnpm-workspace.yaml` sets `trustPolicy: no-downgrade` and its `trustPolicyExclude` does not list vite-plus, so add `vite-plus` and `@voidzero-dev/*` there on the test branch or the preview build is rejected. Its `minimumReleaseAgeExclude` already covers the toolchain. 36 workflows, so read the failing job rather than the first red check. Workflows target `depot-ubuntu-24.04` and `depot-ubuntu-24.04-4`; map both to `ubuntu-24.04` on the test branch. On GitHub-hosted runners a few heavy web specs time out at 5s. The `labeler` workflow is `pull_request_target`, so it stays queued on the base branch's Depot label. GitHub disabled Actions on this fork (dispatch fails with `Actions has been disabled for this repository`); run `web` type-check and unit tests locally. Map the `depot-*` runner labels on the test branch."
     },
     {
       "name": "digital-signature",
@@ -307,14 +291,6 @@
       "notes": "Orval. Deepest `vp run` usage in the catalog (19 scripts) and one of the few bun projects. `pr-checks.yaml` runs on `pull_request` without secrets. `bunfig.toml` sets `minimumReleaseAge = 259200`, so bun rejects any fresh publish; set it to `0` on the test branch, because bun's `minimumReleaseAgeExcludes` does not accept the `@voidzero-dev/*` glob."
     },
     {
-      "name": "oxc-playground",
-      "upstream": "oxc-project/playground",
-      "branch": "main",
-      "packageManager": "pnpm",
-      "monorepo": true,
-      "notes": "fork-CI noise: publish/release steps need `NODE_AUTH_TOKEN`, which the fork does not have, so they fail with `Failed to replace env in config: ${NODE_AUTH_TOKEN}`. Unrelated to vite-plus. NOTE: the org fork is actually named `playground` (GitHub redirects `oxc-playground`), so `gh` calls that build a URL from this name land on the redirect. GitHub disabled Actions on this fork (dispatch fails with `Actions has been disabled for this repository`). Lint and build need the Rust-built `oxc-playground` wasm package, so a local run without the Rust build covers only formatting."
-    },
-    {
       "name": "oxc-walker",
       "upstream": "oxc-project/oxc-walker",
       "branch": "main",
@@ -345,14 +321,6 @@
       "packageManager": "pnpm",
       "monorepo": true,
       "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `cytoscape` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch. Workflows target `namespace-profile-rari-linux-amd64` and `namespace-profile-rari-windows-amd64` (map to `ubuntu-latest` and `windows-latest`) and use `namespacelabs/nscloud-checkout-action` (replace with `actions/checkout`). `Run benchmarks` needs a CodSpeed token. `minimumReleaseAgeExclude` also needs `vite-plus`, `@voidzero-dev/*`, and `@oxc-project/*` when Vite+ pins fresh oxc packages. Its CI uses Namespace cache and artifact actions that need a Namespace volume; replace them with GitHub's cache and artifact actions on the test branch, and gate the CodSpeed upload."
-    },
-    {
-      "name": "react-doctor",
-      "upstream": "millionco/react-doctor",
-      "branch": "main",
-      "packageManager": "pnpm",
-      "monorepo": true,
-      "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds, and also `semver@6.3.1` as a pnpm cross-major false positive (pnpm/pnpm#10202). Add both to `trustPolicyExclude` on the test branch. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\". `vp migrate` removes `oxfmt` from `packages/oxlint-plugin-react-doctor` (a script imports it) and the pinned runtime `oxlint` dependency from `packages/core` and `packages/react-doctor`; restore both on the test branch. `ci.yml` targets `blacksmith-6vcpu-macos-latest`; on `macos-latest` (3 vCPU) the worker-pool test fails. The Node 20 test job cannot pass because vite-plus requires Node 22.18 or later. `Record interactive CLI` fails every cycle: `ni --global` adds to the migrated catalog, then hits `ERR_PNPM_OUTDATED_LOCKFILE`. GitHub disabled Actions on this fork (dispatch fails with `Actions has been disabled for this repository`). `vp migrate` removes the `oxlint` and `oxfmt` dependencies that `packages/core`, `packages/react-doctor`, and the rule-registry script use; restore upstream's specifiers on the test branch. Two tests need the Score API over the network."
     },
     {
       "name": "react-hookz-web",
@@ -480,14 +448,6 @@
       "packageManager": "pnpm",
       "monorepo": true,
       "notes": ""
-    },
-    {
-      "name": "vinext",
-      "upstream": "cloudflare/vinext",
-      "branch": "main",
-      "packageManager": "pnpm",
-      "monorepo": true,
-      "notes": "`ci.yml` runs on `pull_request`, needs no secrets, and covers `vp run build`, `vp run check`, `vp run knip`, and sharded `vp test run` unit and integration suites. High-signal fork. Gate the `preview-release`, `release`, and `*-cloudflare-deploy` workflows, which need credentials the fork does not have. `tests/init-cf-build.test.ts` spawns the generated app's `node_modules/.bin/vite preview`, which does not exist after migration because vite-plus-core has no `vite` bin, so 5 unit tests fail. GitHub disabled Actions on this fork (dispatch fails with `Actions has been disabled for this repository`). `vp migrate` rewrites the `cloudflare-vite-v2` catalog and the scoped `@apps/web>vite` overrides to the core alias; restore the real `vite` pin or the init-cf-build preview tests cannot start `vite preview`."
     },
     {
       "name": "vitepress-carbon",
