@@ -121,12 +121,13 @@ Run the vite-plus harness against the local checkout. The `release-manager` skil
 .github/scripts/test-pkg-pr-new-migrate.sh <PR#> ~/git/github.com/vite-plus-ecosystem-ci/<name> --no-interactive
 ```
 
-Four local problems look like vite-plus failures and are not:
+Five local problems look like vite-plus failures and are not:
 
 - **TLS inspection.** A corporate zero-trust client can re-sign `registry-bridge.viteplus.dev` with a root that the OS trusts but Node does not. Every bridge fetch then fails with `ERR_PNPM_META_FETCH_FAIL ... fetch failed`, while `curl` works. `node -e "fetch('https://registry-bridge.viteplus.dev/vite-plus')"` shows `SELF_SIGNED_CERT_IN_CHAIN`. Export that root certificate and set `NODE_EXTRA_CA_CERTS` for the harness and every control run.
 - **Parallel runs.** Concurrent installs that share one pnpm store can stall at 0% CPU while one process holds the store's `index.db`. Rerun the stuck project alone before you call it a hang.
 - **Bundled npm.** The final install in `vp migrate` uses the Node that the global CLI manages. On Node 22.18 that is npm 10.9, which fails on some `$name` overrides (`Unable to resolve reference $name`) that npm 11 and later resolve. The npm debug log names the npm version that ran.
 - **The harness's environment lines.** The `vp --version` output that the harness prints describes the directory you launched it from, not the project.
+- **Network stalls.** A transient SSH or registry failure fails a whole batch at once (`ssh: connect to host github.com port 22`, `Connection refused`, `could not resolve an immutable registry bridge commit`), and a stalled `git fetch` in the sync step can hang with no output. Retry transient failures, put a timeout on the sync step as well as on the migrate run, and rerun affected projects one at a time.
 
 **How to choose a target.** Select a fork whose stack matches the risk area of the release. Query `ecosystem.json`:
 
@@ -185,10 +186,10 @@ You cannot change the head branch of a PR after you create it. Close the origina
 
 Upgrade vite-plus on that branch. For example, run `vp migrate` from the preview build; see the release-manager skill or the local harness. Commit only the files that the upgrade changes. These are usually `package.json` and the bridge `.npmrc`. Force-add `.npmrc` if the project ignores it in `.gitignore`. Never commit `node_modules`. Projects that commit no lockfile do a fresh install in CI.
 
-**Run `vp fmt` before you commit.** A new oxfmt version formats files that the previous version did not format. Code that the upgrade did not touch can therefore fail a check. Projects whose CI runs `vp check` (or `vp fmt --check`) fail this way. `vp fmt` corrects those files first and adds them to the upgrade commit. Only genuine failures then remain in CI:
+**Run the project's own format command before you commit.** Use its script, config, and scope (for example `vp fmt -c .oxfmtrc.json <paths>`), not a bare `vp fmt`: a bare run ignores a config passed with `-c` and formats files outside the paths the project checks, which produces hundreds of unrelated changes. A new oxfmt version formats files that the previous version did not format. Code that the upgrade did not touch can therefore fail a check. Projects whose CI runs `vp check` (or `vp fmt --check`) fail this way. Running the format command corrects those files first and adds them to the upgrade commit. Only genuine failures then remain in CI:
 
 ```bash
-vp fmt
+vp run format   # the project's format script, or vp fmt with its own config and paths
 git add -A && git commit --amend --no-edit --no-verify
 ```
 
@@ -258,7 +259,17 @@ git log --oneline FETCH_HEAD --not "source/$branch"   # skip the upgrade commit 
 git cherry-pick <fix-commit>
 ```
 
-Re-apply a fix by hand when upstream changes make the cherry-pick conflict.
+Re-apply a fix by hand when upstream changes make the cherry-pick conflict. Find each fork's previous PR with `gh pr list --repo vite-plus-ecosystem-ci/<name> --state all`; an org-wide `gh search` stops at 100 results and silently misses forks.
+
+### Re-sweeping on a new preview build
+
+When the release branch picks up commits that change bundled tools or `vp migrate`, the release needs a new build and a new sweep. Start each fork from its current test branch, so every fix from the previous build carries over, not only the previous cycle's. Order matters:
+
+- Fixes that touch only workflows, configs, or supply-chain gates apply before migrating.
+- Commits made after the old upgrade commit (formatting of migrate-written files, regenerated lockfiles, restored dependencies) apply only after the new upgrade commit. Retry them there. When only a lockfile conflicts, keep the new lockfile and refresh it once at the end.
+- Drop a formatting commit that would add migrate-generated keys to `package.json` or a workspace file before migrate runs. It breaks the pre-migrate install. For example, an added `overrides` block that points at a catalog entry migrate has not written yet makes bun fail with `failed to resolve`.
+
+Then open new PRs and close the superseded ones with `--delete-branch`. Report results per build, so a partial repeat is never mistaken for a full one.
 
 ## Filtering irrelevant fork-CI failures
 
@@ -436,12 +447,14 @@ A project can configure its package manager to refuse a package that is new or t
 | pnpm `strictPeerDependencies: true` | `ERR_PNPM_PEER_DEP_ISSUES` | Set `strictPeerDependencies: false` |
 | npm `min-release-age=N` in `.npmrc` | `npm error code ETARGET ... with a date before <date>` | Set `min-release-age=0` |
 | bun `minimumReleaseAge` in `bunfig.toml` | `was published within minimum release age of N seconds` | Set `minimumReleaseAge = 0` |
+| Yarn age gate (`npmPreapprovedPackages` in `.yarnrc.yml`) | `YN0016: ... All versions satisfying ... are quarantined` | Add the names to `npmPreapprovedPackages` |
 
 Three details that cost time if you do not know them:
 
 - **`trustPolicy` also fires on unrelated third-party packages.** pnpm compares every earlier-published version across **all** majors, so a package whose other major line has provenance trips the check ([pnpm/pnpm#10202](https://github.com/pnpm/pnpm/issues/10202)). `semver@6.3.1` and `cytoscape@3.34.1` are confirmed cases. A regenerated lockfile is what exposes them. Add the offending name to `trustPolicyExclude` too, with a comment pointing at the upstream issue.
 - **Glob support differs between the two pnpm settings and bun.** `@voidzero-dev/*` matches in pnpm's `trustPolicyExclude` and `minimumReleaseAgeExclude`. It does **not** match in bun's `minimumReleaseAgeExcludes`; only exact names work there, so set `minimumReleaseAge = 0` rather than listing every platform package.
 - **A release-age gate is not purely a preview-build artifact.** `trustPolicy` is, because real releases are published with provenance and bridge builds are not. A release-age gate keys off publish time, so it rejects a *real* `vite-plus@X.Y.Z` on release day too and only clears a few days later. Say which of the two you are looking at when you report it.
+- **A gate without an exclude list.** pnpm 11 projects often set `minimumReleaseAge` with no `minimumReleaseAgeExclude`, and `vp migrate` then writes its own list, which covers vite-plus, oxlint, oxfmt, and Vitest but not `@oxc-project/*`. Create the list on the test branch before migrating.
 - **Fresh packages that Vite+ pins trip release-age gates too.** Core pins exact versions of packages such as `@oxc-project/runtime` and `@oxc-project/types`. When those were published inside the project's window, add `@oxc-project/*` (or the named package) to `minimumReleaseAgeExclude`. This is the project's policy, not a vite-plus bug, and it also affects the real release until the packages age.
 
 ### Forks pinning an old pnpm
@@ -471,12 +484,14 @@ Traps:
 - **A `rules` key added after a spread replaces the whole inherited map.** With `lint: { ...config.lint, rules: { ... } }` you silently drop every rule the shared config disabled; one project went from 5 errors to over 2600. Always spread first: `rules: { ...config.lint?.rules, 'my-rule': 'off' }`.
 - **Ignore errors that only exist locally.** `Cannot find module '../../dist/...'`, an unbuilt workspace package, or an ungenerated Prisma client are artifacts of not having run the project's build. CI builds first and never sees them. Do not chase them.
 - **Re-lint and re-test after every code fix, and baseline the failures.** Dropping an unused `test.each` callback parameter breaks the callback's arity and produces fresh type errors. Before blaming your edit for a failing test, stash your changes and rerun: several of these projects have pre-existing failures.
-- **A disable comment above a multi-line type assertion stops working.** Since oxlint-tsgolint 7.0.2002, `typescript/no-unsafe-type-assertion` reports on the `} as T` line, and oxlint matches `oxlint-disable-next-line` against that line ([oxc-project/oxc#27084](https://github.com/oxc-project/oxc/issues/27084)). Move the comment to the line before `} as T`, or wrap the statement in an `oxlint-disable` / `oxlint-enable` block. With `reportUnusedDisableDirectives`, the old comment also becomes an unused-directive error.
+- **A disable comment above a multi-line type assertion stops working.** Since oxlint-tsgolint 7.0.2002, `typescript/no-unsafe-type-assertion` reports on the `} as T` line, and oxlint matches `oxlint-disable-next-line` against that line ([oxc-project/oxc#27084](https://github.com/oxc-project/oxc/issues/27084)). Move the comment to the line before `} as T`, or wrap the statement in an `oxlint-disable` / `oxlint-enable` block. With `reportUnusedDisableDirectives`, the old comment also becomes an unused-directive error. oxlint-tsgolint 7.0.2004 reverts this ([oxc-project/tsgolint#1271](https://github.com/oxc-project/tsgolint/pull/1271)): disable comments above the statement apply again, so drop test-branch commits that moved them, and rebuild oxlint baselines that record diagnostic positions.
 - **Keys that migrate inserts can break sort rules.** `sort-keys` and perfectionist `sort-objects` flag the keys migrate adds to `vite.config.ts`. `vp lint --fix` reorders them.
 - **Rules that key on `vitest` imports go quiet.** After migrate rewrites `vitest` imports to `vite-plus/test`, third-party rules that match the `vitest` import stop firing, and their disable comments become unused.
 
 ## CI caveats
 
+- **Scripts that run the `vite` binary break after migrate.** `vp migrate` points `vite` at `@voidzero-dev/vite-plus-core`, which ships no `vite` executable, and it also rewrites catalog entries and scoped overrides that deliberately pin a real `vite`. Scripts that call `node_modules/.bin/vite`, `vite/bin/vite.js`, or `pnpm exec vite` then fail. On the test branch, restore upstream's real `vite` pin or switch the script to `vp`.
+- **GitHub can disable Actions on a fork without the setting showing it.** The PR reports no checks, the permissions API still says `enabled: true`, and `gh workflow run` fails with `Actions has been disabled for this repository`. Only an org owner or GitHub Support can restore it. Until then, run the fork's main CI commands locally against the preview and report that evidence separately.
 - A `push` event triggers the CI of some forks, and a `pull_request` event does not. `notes` flags these forks; `codiff` and `delta-comic` are examples. A PR against them does not run their CI. If you need PR CI, add a `pull_request` trigger to the `on:` block of the workflow **inside the ecosystem-ci PR**. Do not add it as a separate commit on the tracked branch. The fork then stays clean against upstream.
 - Keep the tracked branch clean. Do not commit unrelated changes to it. It must differ from upstream only by the changes that a release test needs.
 - **Do not run `vp fmt` blindly before committing.** The advice to run it exists because a newer oxfmt formats files the previous one left alone. On a project that oxfmt has never formatted, it rewrites the whole tree: one commit reached 562 files and 73k lines, which buries the upgrade and makes the PR unreviewable. Check `git diff --stat` first. If the count is far above the file count that `vp migrate` reported as rewritten, drop the `vp fmt` and commit the migration alone.
@@ -546,6 +561,7 @@ These repos are deliberately out of the catalog. Do not add one again before you
 | `mlx-node` (`huggingface/mlx-node`) | Both failing jobs are Rust jobs (`cargo test`, `-p mlx-core --test kquant_ggml_parity`), and they do not exercise vite-plus. Its JS surface is too small for the triage cost. |
 | `tech-interview-handbook` (`yangshun/tech-interview-handbook`) | This Docusaurus site fails its build with a webpack error, `ProgressPlugin ... does not match the API schema`, which is unrelated to vite-plus. It has no passing check to balance that failure. |
 | `zerobyte` (`nicotsx/zerobyte`) | It costs work every release and returns nothing. Its `bunfig.toml` sets `minimumReleaseAge = 259200`, so bun refuses any fresh publish and the upgrade needs a test-branch patch every time. Once past that, its own dependency set breaks: a regenerated lockfile pairs `@better-auth/api-key@1.6.27` with `@better-auth/core@1.7.1`, which no longer exports `getIp`, and that one skew fails `build`, `typecheck`, and seven test files. Its `lint` script also hardcodes `node ./node_modules/oxlint/bin/oxlint`, a path the vite-plus toolchain model does not create. No check is left that says anything about the release. |
+| `videojs-v10` (`videojs/v10`) | Upstream moved Video.js v10 to `videojs/video.js` and removed every source file from `videojs/v10`, so the fork has nothing left to test. Fork `videojs/video.js` to bring Video.js back into the catalog. |
 | `monorepo` (`zap-studio/monorepo`) | It does not use vite-plus. Its scripts call `oxlint`, `oxfmt`, `tsdown`, and `vitest` directly through `pnpm exec`, and no script runs `vp`. A version bump therefore changes nothing that its CI executes. Migrate it first if you want it in the catalog. |
 
 ### Checks that count as passing
