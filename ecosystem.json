@@ -27,6 +27,14 @@
       "notes": "`JavaScript / Test` runs `vp dlx playwright install`, which installs the latest Playwright browsers rather than the version the project pins, so the browser executable is missing. Not caused by vite-plus."
     },
     {
+      "name": "better-ajv-errors",
+      "upstream": "atlassian/better-ajv-errors",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": false,
+      "notes": "Atlassian JSON schema error formatter on vite-plus 1.1.0 through the catalog, which also pins `vitest` 5.0.3 and the `@vitest/*` packages, so update those with the preview build. Scripts run `vp pack`, `vp fmt --check`, `vp lint`, and `vp test --coverage`. `main.yml` runs `test` and `lint` jobs on `pull_request` without secrets (Codecov upload is optional). `release.yml` only runs on the upstream repository."
+    },
+    {
       "name": "bippy",
       "upstream": "aidenybai/bippy",
       "branch": "main",
@@ -187,6 +195,14 @@
       "notes": ""
     },
     {
+      "name": "graph-explorer",
+      "upstream": "aws/graph-explorer",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "AWS Graph Explorer, on vite-plus 1.1.0 through the catalog, so a sweep exercises a real upgrade. Scripts run `vp config`, `vp lint`, `vp fmt`, and `vp test run`. `ci.yml` runs one `checks-and-tests` job on `pull_request` without secrets. `pnpm-workspace.yaml` sets `minimumReleaseAge: 1440` and `trustPolicy: no-downgrade`, so exempt the preview build (`vite-plus`, `@voidzero-dev/*`) and freshly pinned toolchain packages on the test branch. `.npmrc` sets `engine-strict=true`."
+    },
+    {
       "name": "Ivy-Framework",
       "upstream": "Ivy-Interactive/Ivy-Framework",
       "branch": "development",
@@ -209,6 +225,14 @@
       "packageManager": "pnpm",
       "monorepo": false,
       "notes": "pinned to a very old vite-plus (0.1.x) and still using the removed `@voidzero-dev/vite-plus-test` alias, so `vp migrate` performs a multi-release jump. Resulting TypeScript errors are not evidence about the release under test. Re-pin before using it as an upgrade signal."
+    },
+    {
+      "name": "local-studio",
+      "upstream": "sybil-solutions/local-studio",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "Local Studio, a pnpm 11 monorepo (`apps/*`, `packages/*`) on vite-plus 1.0.0 through the catalog; scripts drive builds with `vp run --filter`. `ci.yml` runs on `pull_request` without secrets on GitHub-hosted runners (`ubuntu-latest`, `macos-15`); `release.yml` needs Apple signing secrets and runs only on push and dispatch. `prepare` runs `effect-tsgo patch`, so like sigle it needs an `@effect/tsgo` release that supports the bundled oxlint and oxlint-tsgolint versions. `minimumReleaseAgeExclude` exists without an explicit `minimumReleaseAge`, so pnpm 11 applies its default gate; extend the list for fresh toolchain packages on the test branch."
     },
     {
       "name": "matterviz",
@@ -315,6 +339,14 @@
       "notes": ""
     },
     {
+      "name": "raindrop-mcp",
+      "upstream": "adeze/raindrop-mcp",
+      "branch": "master",
+      "packageManager": "bun",
+      "monorepo": true,
+      "notes": "Raindrop.io MCP server, a bun project on vite-plus 1.1.0 (direct pin plus the `vite` core alias). Scripts run `vp check`, `vp lint`, `vp fmt`, and `vp test run`. `publish.yml` runs its `test` job (lint, format check, type-check, build, unit and MCP integration tests) on `pull_request` with only `GITHUB_TOKEN`; the `release` job runs only on pushes to `master`, so nothing needs gating. One workspace: `tooling/compiler-api`."
+    },
+    {
       "name": "rari",
       "upstream": "rari-build/rari",
       "branch": "main",
@@ -337,6 +369,14 @@
       "packageManager": "bun",
       "monorepo": false,
       "notes": ""
+    },
+    {
+      "name": "react-useanimations",
+      "upstream": "useAnimations/react-useanimations",
+      "branch": "main",
+      "packageManager": "npm",
+      "monorepo": true,
+      "notes": "React animated icon library on vite-plus 1.1.0, with an npm workspace for `website`. Scripts run `vp pack`, `vp check`, and `vp test run`. `ci.yml` runs the `test` matrix (React versions, Playwright browsers) on `pull_request` without secrets. Its `preview` job runs for same-repository PRs and deploys to Netlify with `secrets.NETLIFY_AUTH_TOKEN`, so it fails on the fork; judge the run by the `test` jobs."
     },
     {
       "name": "redis-me",
@@ -377,6 +417,14 @@
       "packageManager": "pnpm",
       "monorepo": true,
       "notes": ""
+    },
+    {
+      "name": "soybean-admin-antd",
+      "upstream": "soybeanjs/soybean-admin-antd",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "Vue admin template (pnpm 12 workspace, `packages/*`). The catalog pins `vite-plus: latest` and `vite: npm:@voidzero-dev/vite-plus-core@latest`; scripts run `vp dev`, `vp build`, `vp fmt`, `vp lint`, and `vp config`. `.npmrc` points at registry.npmmirror.com. No PR workflow runs vp: `linter.yml` runs super-linter and `pr-agent.yml` needs `secrets.OPENAI_KEY`, so validate locally with `vp build` and `vp lint`. `minimumReleaseAgeExclude` exists without an explicit `minimumReleaseAge`, so pnpm's default gate applies."
     },
     {
       "name": "svelte-multiselect",
@@ -464,6 +512,14 @@
       "packageManager": "pnpm",
       "monorepo": true,
       "notes": "supply-chain gate: `trustPolicy: no-downgrade` rejects bridge preview builds. Add `trustPolicyExclude` for `vite-plus` and `@voidzero-dev/*` on the test branch. On the test branch, skip the preview-publish step: it needs a GitHub App or token the fork does not have and does not exercise the pinned Vite+. See \"Forks that publish a preview package\"."
+    },
+    {
+      "name": "VRM-Addon-for-Blender",
+      "upstream": "saturday06/VRM-Addon-for-Blender",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": false,
+      "notes": "Mostly a Python Blender add-on; Node tooling is on vite-plus 1.1.0 with pnpm 12. `vite.config.ts` configures `fmt` and `lint`. `lint.yml` runs on `pull_request` through `setup-vp`: `tools/lint.sh` runs `vp install` and `vp lint --deny-warnings`, and other jobs run `vp run vrm-validator`, `vp run docs:build`, and `vp run devcontainer`. `test.yml` and `benchmark.yml` exercise Blender on GitHub-hosted Linux, macOS, and Windows runners and do not use vp. release-please needs secrets."
     },
     {
       "name": "vue-clamp",
