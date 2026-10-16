@@ -193,7 +193,7 @@ vp run format   # the project's format script, or vp fmt with its own config and
 git add -A && git commit --amend --no-edit --no-verify
 ```
 
-`vp migrate` installs Vite+ git hooks. The project's own pre-commit and pre-push checks then run against the test commit. Those checks can block the commit because of lint or type errors that are already in the project. Use `--no-verify` on both `git commit` and `git push` for these test commits.
+`vp migrate` installs Vite+ git hooks. The project's own pre-commit and pre-push checks then run against the test commit. Those checks can block the commit because of lint or type errors that are already in the project. Use `--no-verify` on both `git commit` and `git push` for these test commits. `--no-verify` does not skip a `prepare-commit-msg` hook, and some projects use one to rewrite the subject: gitmoji turns it into `🚨 test: upgrade vite-plus prerelease`. Tooling that finds the upgrade commit by its subject must allow such a prefix.
 
 **Keep the commit subject short.** The obvious subject is `test: upgrade vite-plus to prerelease 0.0.0-commit.<40-char sha>`. It is more than 70 characters, so it fails commitlint's default `header-max-length` of 72 on every project that runs commitlint. That red check comes from the test commit itself, not from the project. Put the version in the commit body instead:
 
@@ -442,12 +442,12 @@ A project can configure its package manager to refuse a package that is new or t
 
 | Gate | Error you see | Test-branch fix |
 | --- | --- | --- |
-| pnpm `trustPolicy: no-downgrade` | `ERR_PNPM_TRUST_DOWNGRADE ... (possible package takeover)` | Add `trustPolicyExclude: [vite-plus, "@voidzero-dev/*"]` to `pnpm-workspace.yaml` |
+| pnpm `trustPolicy: no-downgrade` | `ERR_PNPM_TRUST_DOWNGRADE ... (possible package takeover)` | Add `trustPolicyExclude: [vite-plus, "@voidzero-dev/*"]` to `pnpm-workspace.yaml`, creating the key when the project sets only `trustPolicy` |
 | pnpm `minimumReleaseAge` | `ERR_PNPM_...` naming a too-new version | Add the same names to `minimumReleaseAgeExclude` |
 | pnpm `strictPeerDependencies: true` | `ERR_PNPM_PEER_DEP_ISSUES` | Set `strictPeerDependencies: false` |
 | npm `min-release-age=N` in `.npmrc` | `npm error code ETARGET ... with a date before <date>` | Set `min-release-age=0` |
 | bun `minimumReleaseAge` in `bunfig.toml` | `was published within minimum release age of N seconds` | Set `minimumReleaseAge = 0` |
-| Yarn age gate (`npmPreapprovedPackages` in `.yarnrc.yml`) | `YN0016: ... All versions satisfying ... are quarantined` | Add the names to `npmPreapprovedPackages` |
+| Yarn age gate (`npmMinimalAgeGate`, on by default in Yarn 4.18) | `YN0016: ... All versions satisfying ... are quarantined` | Add `vite-plus` and `'@voidzero-dev/*'` to `npmPreapprovedPackages` in `.yarnrc.yml`, creating the key if needed |
 
 Three details that cost time if you do not know them:
 
@@ -455,6 +455,7 @@ Three details that cost time if you do not know them:
 - **Glob support differs between the two pnpm settings and bun.** `@voidzero-dev/*` matches in pnpm's `trustPolicyExclude` and `minimumReleaseAgeExclude`. It does **not** match in bun's `minimumReleaseAgeExcludes`; only exact names work there, so set `minimumReleaseAge = 0` rather than listing every platform package.
 - **A release-age gate is not purely a preview-build artifact.** `trustPolicy` is, because real releases are published with provenance and bridge builds are not. A release-age gate keys off publish time, so it rejects a *real* `vite-plus@X.Y.Z` on release day too and only clears a few days later. Say which of the two you are looking at when you report it.
 - **A gate without an exclude list.** pnpm 11 projects often set `minimumReleaseAge` with no `minimumReleaseAgeExclude`, and `vp migrate` then writes its own list, which covers vite-plus, oxlint, oxfmt, and Vitest but not `@oxc-project/*`. Create the list on the test branch before migrating.
+- **Yarn 4 gates projects that configure nothing.** Yarn 4.18.1 defaults `npmMinimalAgeGate` to 1440 minutes, so it quarantines the preview build even when `.yarnrc.yml` sets no gate. `vp migrate` preapproves only `vitest` and `@vitest/*`, so add `vite-plus` and `'@voidzero-dev/*'` before migrating. Like pnpm's gate, it also holds back a real release for its first day.
 - **Fresh packages that Vite+ pins trip release-age gates too.** Core pins exact versions of packages such as `@oxc-project/runtime` and `@oxc-project/types`. When those were published inside the project's window, add `@oxc-project/*` (or the named package) to `minimumReleaseAgeExclude`. This is the project's policy, not a vite-plus bug, and it also affects the real release until the packages age.
 
 ### Forks pinning an old pnpm
