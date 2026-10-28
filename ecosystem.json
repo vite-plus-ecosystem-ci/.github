@@ -427,6 +427,14 @@
       "notes": "Raindrop.io MCP server, a bun project on vite-plus 1.1.0 (direct pin plus the `vite` core alias). Scripts run `vp check`, `vp lint`, `vp fmt`, and `vp test run`. `publish.yml` runs its `test` job (lint, format check, type-check, build, unit and MCP integration tests) on `pull_request` with only `GITHUB_TOKEN`; the `release` job runs only on pushes to `master`, so nothing needs gating. One workspace: `tooling/compiler-api`."
     },
     {
+      "name": "ramen-api",
+      "upstream": "yusukebe/ramen-api",
+      "branch": "master",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "Hono API on Cloudflare Workers with pnpm catalogs. `ci.yml` runs on `pull_request` with Node 24 and no secrets: `vp check`, `vp test run`, and `vp run validate`. Validation requires full Git history (`fetch-depth: 0`). `cd.yml` deploys on pushes to `master` and needs `CF_API_TOKEN` and `CF_ACCOUNT_ID`, which the fork does not have."
+    },
+    {
       "name": "rari",
       "upstream": "rari-build/rari",
       "branch": "main",
