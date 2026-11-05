@@ -121,13 +121,14 @@ Run the vite-plus harness against the local checkout. The `release-manager` skil
 .github/scripts/test-pkg-pr-new-migrate.sh <PR#> ~/git/github.com/vite-plus-ecosystem-ci/<name> --no-interactive
 ```
 
-Five local problems look like vite-plus failures and are not:
+Six local problems look like vite-plus failures and are not:
 
 - **TLS inspection.** A corporate zero-trust client can re-sign `registry-bridge.viteplus.dev` with a root that the OS trusts but Node does not. Every bridge fetch then fails with `ERR_PNPM_META_FETCH_FAIL ... fetch failed`, while `curl` works. `node -e "fetch('https://registry-bridge.viteplus.dev/vite-plus')"` shows `SELF_SIGNED_CERT_IN_CHAIN`. Export that root certificate and set `NODE_EXTRA_CA_CERTS` for the harness and every control run.
 - **Parallel runs.** Concurrent installs that share one pnpm store can stall at 0% CPU while one process holds the store's `index.db`. Rerun the stuck project alone before you call it a hang.
 - **Bundled npm.** The final install in `vp migrate` uses the Node that the global CLI manages. On Node 22.18 that is npm 10.9, which fails on some `$name` overrides (`Unable to resolve reference $name`) that npm 11 and later resolve. The npm debug log names the npm version that ran.
 - **The harness's environment lines.** The `vp --version` output that the harness prints describes the directory you launched it from, not the project.
 - **Network stalls.** A transient SSH or registry failure fails a whole batch at once (`ssh: connect to host github.com port 22`, `Connection refused`, `could not resolve an immutable registry bridge commit`), and a stalled `git fetch` in the sync step can hang with no output. Retry transient failures, put a timeout on the sync step as well as on the migrate run, and rerun affected projects one at a time.
+- **Stale pnpm metadata from an earlier sweep.** pnpm caches package metadata under the bridge registry, and an entry from an earlier sweep can be weeks old. The migrate install then fails with `ERR_PNPM_NO_MATCHING_VERSION` for a version that npm serves, and pnpm names an older "latest release". Delete the bridge-keyed metadata older than a day (on macOS: `find ~/Library/Caches/pnpm/v*/metadata* -path '*registry-bridge.viteplus.dev*' -type f -mtime +0 -delete`) and rerun the project.
 
 **How to choose a target.** Select a fork whose stack matches the risk area of the release. Query `ecosystem.json`:
 
@@ -217,6 +218,8 @@ gh pr create --repo vite-plus-ecosystem-ci/$name --base "$branch" \
 gh pr view <PR#> --repo vite-plus-ecosystem-ci/$name --json isCrossRepository --jq '.isCrossRepository'   # must be false
 ```
 
+Keep the PR description, PR comments, and test-branch commit messages free of references to vite-plus PRs or issues, such as `voidzero-dev/vite-plus#123` or their URLs. GitHub records each one as a "mentioned this" entry on the vite-plus timeline, so one sweep adds dozens of entries to the release PR, and editing the text later does not remove them. Write plain text such as `vite-plus 1.5.0` instead.
+
 ### 4. Collect links and watch CI
 
 After all PRs are open, list them in a table for review. Give the project, the PR link, the base, the prerelease, the assignee, and the CI status. Then check the CI of each PR for failures that the **upgrade** caused:
@@ -261,12 +264,17 @@ git cherry-pick <fix-commit>
 
 Re-apply a fix by hand when upstream changes make the cherry-pick conflict. Find each fork's previous PR with `gh pr list --repo vite-plus-ecosystem-ci/<name> --state all`; an org-wide `gh search` stops at 100 results and silently misses forks.
 
+Do not carry every old fix forward unchanged:
+
+- Drop a fix that upstream made obsolete. For example, a config override that disables a rule for some files can turn upstream's newer inline disable comments into "unused directive" errors.
+- Redo a fix that pins tool versions, such as restored `oxfmt` or `oxlint` devDependencies, with the versions that the current build bundles. A cherry-picked pin from an older cycle can leave lockfile entries for an older preview, and the frozen install then fails with `Broken lockfile: no entry for ...`.
+
 ### Re-sweeping on a new preview build
 
 When the release branch picks up commits that change bundled tools or `vp migrate`, the release needs a new build and a new sweep. Start each fork from its current test branch, so every fix from the previous build carries over, not only the previous cycle's. Order matters:
 
 - Fixes that touch only workflows, configs, or supply-chain gates apply before migrating.
-- Commits made after the old upgrade commit (formatting of migrate-written files, regenerated lockfiles, restored dependencies) apply only after the new upgrade commit. Retry them there. When only a lockfile conflicts, keep the new lockfile and refresh it once at the end.
+- Commits made after the old upgrade commit (formatting of migrate-written files, regenerated lockfiles, restored dependencies) apply only after the new upgrade commit. Retry them there. When only a lockfile conflicts, keep the new lockfile and refresh it once at the end. If the re-applied commit also changes `package.json`, reinstall before you push: a frozen install in the fork's CI fails when `package.json` and the lockfile disagree.
 - Drop a formatting commit that would add migrate-generated keys to `package.json` or a workspace file before migrate runs. It breaks the pre-migrate install. For example, an added `overrides` block that points at a catalog entry migrate has not written yet makes bun fail with `failed to resolve`.
 
 Then open new PRs and close the superseded ones with `--delete-branch`. Report results per build, so a partial repeat is never mistaken for a full one.
@@ -310,6 +318,7 @@ Only `False` shows a publishing problem. Always search the install step for `err
 - `ERR_PNPM_TARBALL_URL_MISMATCH`, or a failed supply-chain policy check against the bridge tarball URLs
 - `ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION`, when a project declares `vite` as a peer dependency
 - a Docker build whose context does not contain the bridge `.npmrc`
+- a check that compares the Vite+ block that `vp config` writes into `AGENTS.md`: preview builds put the PR's docs preview origin into that block, while release builds use `https://viteplus.dev`. Refresh the block on the test branch (`vp run prepare` or `vp config`) and commit it.
 - two `vite-plus` versions in `pnpm why`: the prerelease does not match `*`, so a package with an optional `vite-plus: '*'` peer (oxlint, oxfmt) can keep a stale `vite-plus` from the old lockfile
 - a project check that queries `vite@*` or `vite-plus@*` and finds nothing, such as a phantom-override check
 - npm 10 `Unable to resolve reference $vite-plus` on a nested `overrides` entry
@@ -456,7 +465,16 @@ Three details that cost time if you do not know them:
 - **A release-age gate is not purely a preview-build artifact.** `trustPolicy` is, because real releases are published with provenance and bridge builds are not. A release-age gate keys off publish time, so it rejects a *real* `vite-plus@X.Y.Z` on release day too and only clears a few days later. Say which of the two you are looking at when you report it.
 - **A gate without an exclude list.** pnpm 11 projects often set `minimumReleaseAge` with no `minimumReleaseAgeExclude`, and `vp migrate` then writes its own list, which covers vite-plus, oxlint, oxfmt, and Vitest but not `@oxc-project/*`. Create the list on the test branch before migrating.
 - **Yarn 4 gates projects that configure nothing.** Yarn 4.18.1 defaults `npmMinimalAgeGate` to 1440 minutes, so it quarantines the preview build even when `.yarnrc.yml` sets no gate. `vp migrate` preapproves only `vitest` and `@vitest/*`, so add `vite-plus` and `'@voidzero-dev/*'` before migrating. Like pnpm's gate, it also holds back a real release for its first day.
-- **Fresh packages that Vite+ pins trip release-age gates too.** Core pins exact versions of packages such as `@oxc-project/runtime` and `@oxc-project/types`. When those were published inside the project's window, add `@oxc-project/*` (or the named package) to `minimumReleaseAgeExclude`. This is the project's policy, not a vite-plus bug, and it also affects the real release until the packages age.
+- **Fresh packages that Vite+ pins trip release-age gates too.** Core pins exact versions of packages such as `@oxc-project/runtime` and `@oxc-project/types`. When those were published inside the project's window, add `@oxc-project/*` (or the named package) to `minimumReleaseAgeExclude`. For Yarn, add them to `npmPreapprovedPackages`, together with a fresh `oxfmt` and `'@oxfmt/*'` when the build pins one. This is the project's policy, not a vite-plus bug, and it also affects the real release until the packages age.
+
+### Known `vp migrate` gaps
+
+These are vite-plus bugs that real users hit too, not preview-build artifacts. Each one existed in at least two consecutive releases. Fix them on the test branch so the fork still gives a signal, and record the affected forks in `notes`:
+
+- **Bun `package.json` catalogs.** Migrate rewrites `@vitest/*` dependencies (such as `@vitest/coverage-v8` or `@vitest/ui`) to `catalog:` but adds no matching catalog entry, so the install fails with `@vitest/...@catalog: is not in the catalog`. Add the entries at the bundled Vitest version, in `catalog` or `workspaces.catalog`, and reinstall.
+- **Format settings in `oxfmt.config.ts`.** Migrate detects `.oxfmtrc.json` and `.oxfmtrc.jsonc` only. It formats the files whose imports it rewrites with oxfmt defaults (double quotes, semicolons), which can touch more than 100 test files, and the project's format check then fails. Point `fmt` in `vite.config.ts` at the project config and reformat exactly those files.
+- **`tsdown --config <file>`.** Migrate rewrites it to `vp pack --config <file>`, but `vp pack` has no `--config` option, so it takes the file as an extra entry and the build fails in the dts plugin (`... received "../../tsdown.config.d"`). Drop the option and move the config into `vite.config.ts`.
+- **Projects without a lockfile.** On a clean clone, migrate selects pnpm and writes `catalog:` specs and pnpm files. A project whose CI installs with npm then fails with `EOVERRIDE`. Generate an untracked `package-lock.json` before you migrate, or convert the test branch back to npm: pin the preview versions in `devDependencies` and `overrides`, and drop the generated pnpm files.
 
 ### Forks pinning an old pnpm
 
@@ -492,7 +510,16 @@ Traps:
 ## CI caveats
 
 - **Scripts that run the `vite` binary break after migrate.** `vp migrate` points `vite` at `@voidzero-dev/vite-plus-core`, which ships no `vite` executable, and it also rewrites catalog entries and scoped overrides that deliberately pin a real `vite`. Scripts that call `node_modules/.bin/vite`, `vite/bin/vite.js`, or `pnpm exec vite` then fail. On the test branch, restore upstream's real `vite` pin or switch the script to `vp`.
-- **GitHub can disable Actions on a fork without the setting showing it.** The PR reports no checks, the permissions API still says `enabled: true`, and `gh workflow run` fails with `Actions has been disabled for this repository`. Only an org owner or GitHub Support can restore it. Until then, run the fork's main CI commands locally against the preview and report that evidence separately.
+- **GitHub can disable Actions on a fork without the setting showing it.** The PR reports no checks, the permissions API still says `enabled: true`, and `gh workflow run` fails with `Actions has been disabled for this repository`. Only an org owner or GitHub Support can restore it. Until then, run the fork's main CI commands locally against the preview and report that evidence separately. Check every fork before a sweep, because a PR with no checks can look like a pass in a tally:
+
+  ```bash
+  jq -r '.repos[].name' ecosystem.json | while read -r name; do
+    printf '%s\t' "$name"
+    gh api "repos/vite-plus-ecosystem-ci/$name/actions/runs?per_page=1" --jq '.workflow_runs[0].created_at // "none"'
+  done
+  ```
+
+  A last run older than the previous sweep, while that sweep opened PRs on the fork, means that Actions is off. In the v1.5.0 sweep, nine forks had their last run on 2026-10-14 and one on 2026-10-22. Move such forks to "Excluded repos" until Actions runs again, unless the release manager keeps a fork for local verification. For a kept fork, say so in its `notes`, list its main CI commands there, and run them locally against the preview in every sweep. `npmx.dev` and `tiptap` are kept this way.
 - A `push` event triggers the CI of some forks, and a `pull_request` event does not. `notes` flags these forks; `codiff` and `delta-comic` are examples. A PR against them does not run their CI. If you need PR CI, add a `pull_request` trigger to the `on:` block of the workflow **inside the ecosystem-ci PR**. Do not add it as a separate commit on the tracked branch. The fork then stays clean against upstream.
 - Keep the tracked branch clean. Do not commit unrelated changes to it. It must differ from upstream only by the changes that a release test needs.
 - **Do not run `vp fmt` blindly before committing.** The advice to run it exists because a newer oxfmt formats files the previous one left alone. On a project that oxfmt has never formatted, it rewrites the whole tree: one commit reached 562 files and 73k lines, which buries the upgrade and makes the PR unreviewable. Check `git diff --stat` first. If the count is far above the file count that `vp migrate` reported as rewritten, drop the `vp fmt` and commit the migration alone.
@@ -567,7 +594,15 @@ These repos are deliberately out of the catalog. Do not add one again before you
 | `playground` (`oxc-project/playground`) | GitHub disabled Actions on the fork: `gh workflow run` fails with `Actions has been disabled for this repository` while the permissions API still reports `enabled: true`, so test PRs get no checks. Only an org owner or GitHub Support can restore it. Re-add the fork once Actions runs again. Catalogued as `oxc-playground` until GitHub renamed the fork. |
 | `react-doctor` (`millionco/react-doctor`) | GitHub disabled Actions on the fork: `gh workflow run` fails with `Actions has been disabled for this repository` while the permissions API still reports `enabled: true`, so test PRs get no checks. Only an org owner or GitHub Support can restore it. Re-add the fork once Actions runs again. |
 | `vinext` (`cloudflare/vinext`) | GitHub disabled Actions on the fork: `gh workflow run` fails with `Actions has been disabled for this repository` while the permissions API still reports `enabled: true`, so test PRs get no checks. Only an org owner or GitHub Support can restore it. Re-add the fork once Actions runs again. |
-| `videojs-v10` (`videojs/v10`) | Upstream moved Video.js v10 to `videojs/video.js` and removed every source file from `videojs/v10`, so the fork has nothing left to test. Video.js is catalogued through the `video.js` fork. |
+| `evcc` (`evcc-io/evcc`) | GitHub disabled Actions on the fork: no workflow has run since 2026-10-14, including for the v1.5.0 smoke PRs. Same cause and remedy as `BlockNote`. Re-add the fork once Actions runs again. |
+| `freecut` (`walterlow/freecut`) | GitHub disabled Actions on the fork: no workflow has run since 2026-10-14. Same cause and remedy as `BlockNote`. Re-add the fork once Actions runs again. |
+| `jaeger-ui` (`jaegertracing/jaeger-ui`) | GitHub disabled Actions on the fork: no workflow has run since 2026-10-14. Same cause and remedy as `BlockNote`. Re-add the fork once Actions runs again. |
+| `koel` (`koel/koel`) | GitHub disabled Actions on the fork: no workflow has run since 2026-10-14, and `gh workflow run` fails with `Actions has been disabled for this repository`. Re-add the fork once Actions runs again. |
+| `orval` (`orval-labs/orval`) | GitHub disabled Actions on the fork: no workflow has run since 2026-10-14. Same cause and remedy as `BlockNote`. Re-add the fork once Actions runs again. |
+| `pdfme` (`pdfme/pdfme`) | GitHub disabled Actions on the fork: no workflow has run since 2026-10-14. Same cause and remedy as `BlockNote`. Re-add the fork once Actions runs again. |
+| `rari` (`rari-build/rari`) | GitHub disabled Actions on the fork: no workflow has run since 2026-10-14. Same cause and remedy as `BlockNote`. Re-add the fork once Actions runs again. |
+| `video.js` (`videojs/video.js`) | GitHub disabled Actions on the fork: no workflow has run since 2026-10-22, and `gh workflow run` fails with `Actions has been disabled for this repository`. Re-add the fork once Actions runs again. |
+| `videojs-v10` (`videojs/v10`) | Upstream moved Video.js v10 to `videojs/video.js` and removed every source file from `videojs/v10`, so the fork has nothing left to test. Video.js was catalogued through the `video.js` fork, which is now excluded too (see below). |
 | `monorepo` (`zap-studio/monorepo`) | It does not use vite-plus. Its scripts call `oxlint`, `oxfmt`, `tsdown`, and `vitest` directly through `pnpm exec`, and no script runs `vp`. A version bump therefore changes nothing that its CI executes. Migrate it first if you want it in the catalog. |
 
 ### Checks that count as passing
