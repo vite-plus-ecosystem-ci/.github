@@ -307,6 +307,14 @@
       "notes": ""
     },
     {
+      "name": "npmx.dev",
+      "upstream": "npmx-dev/npmx.dev",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": "The org copy is a detached fork (no GitHub parent), so `gh repo fork` cannot re-link it; the `source` remote must be added by hand. `Component tests` has failed since the 1.0.0-rc.1 cycle: 45 a11y tests reject a `@vue/compiler-core` `decodeEntities` warning in Vitest 5 browser mode. See why-reproductions-are-required/vitest-vue-compiler-decode-entities. CI installs through Socket Firewall (`sfw: true` in setup-vp); with a preview build the package-manager download from the bridge `.npmrc` fails with `UnknownIssuer` (voidzero-dev/vite-plus#3031), so set `sfw: false` on the test branch. `.github/zizmor.yml` ignores a finding by line number in `lunaria.yml`, so keep that `uses:` line where it is. GitHub disabled Actions on this fork (no workflow has run since 2026-10-14), so its smoke PR gets no checks. Keep it for local verification: run the `vp migrate` harness, then its main CI commands against the preview (`vp check` and `vp test run --project unit`). In the v1.5.0 sweep the unit tests passed, and `vp check` flagged only four HTML email templates for the new oxfmt HTML formatter."
+    },
+    {
       "name": "nshipster.com",
       "upstream": "NSHipster/nshipster.com",
       "branch": "master",
@@ -513,6 +521,14 @@
       "packageManager": "pnpm",
       "monorepo": true,
       "notes": "SvelteKit embed components (pnpm 12 workspace, `apps/*` and `packages/*`). The catalog pins vite-plus 1.1.0 with `vitest` 5.0.3 and `@vitest/*` 5.0.3, so update those with the preview build. Scripts run `vp check` and `vp build`. `unit-test.yml` runs build, check, and `test:ci` on `pull_request` targeting `main`; it reads the optional `PUBLIC_FATHOM_*` secrets as env. `minimumReleaseAge: 2880` and `.npmrc` `engine-strict=true` (Node >= 24.15.0)."
+    },
+    {
+      "name": "tiptap",
+      "upstream": "ueberdosis/tiptap",
+      "branch": "main",
+      "packageManager": "pnpm",
+      "monorepo": true,
+      "notes": " GitHub disabled Actions on this fork (no workflow has run since 2026-10-14), so its smoke PR gets no checks. Keep it for local verification: run the `vp migrate` harness, then its main CI commands against the preview (`vp check` and `vp test run`). Both passed in the v1.5.0 sweep."
     },
     {
       "name": "trpc-nuxt",
