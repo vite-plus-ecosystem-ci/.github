@@ -664,7 +664,7 @@
       "branch": "main",
       "packageManager": "npm",
       "monorepo": true,
-      "notes": ""
+      "notes": "GitHub disabled Actions on this fork: no workflow has run since 2026-11-10, and the v1.7.0 smoke PR got no run, also after a close and reopen. Keep it for local verification: run the `vp migrate` harness, then its main CI commands against the preview (`vp install`, `npm run bootstrap`, `npm run lint`, and `vp test`; `cargo test` covers only the Rust crates). All four passed in the v1.7.0 sweep."
     },
     {
       "name": "yielded-auth",
