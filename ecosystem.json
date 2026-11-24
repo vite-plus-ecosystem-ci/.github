@@ -208,7 +208,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "project-side: `example/server-graphql/scripts/generate-graphql.tsx` imports `oxfmt` without declaring it, so it only resolves through hoisting. Fails with `Cannot find package 'oxfmt'` whenever the lockfile is regenerated. Unrelated to vite-plus. `vp migrate` stops on the Vitest v5 `benchmark-api` block (a bench call needs manual migration), on v1.0.0 too."
+      "notes": "GitHub disabled Actions on this fork: no workflow has run since the v1.7.0 smoke PR on 2026-11-16, and `gh workflow run` fails with `Actions has been disabled for this repository`. Keep it for local verification: run the `vp migrate` harness, then its main CI commands against the preview in CI order (`vp run dev:setup`, `vp run build:all`, `vp run build:api-docs`, `vp run copy-package-docs`, `vp check`, and `vp test`). `vp check` and `vp build` fail on missing generated files if you skip the setup steps. All six passed in the v1.8.0 sweep. project-side: `example/server-graphql/scripts/generate-graphql.tsx` imports `oxfmt` without declaring it, so it only resolves through hoisting. Fails with `Cannot find package 'oxfmt'` whenever the lockfile is regenerated. Unrelated to vite-plus. `vp migrate` stops on the Vitest v5 `benchmark-api` block (a bench call needs manual migration), on v1.0.0 too."
     },
     {
       "name": "gitify",
@@ -248,7 +248,7 @@
       "branch": "main",
       "packageManager": "pnpm",
       "monorepo": true,
-      "notes": "Kaneo project management app (pnpm 10 workspace, `onlyBuiltDependencies`) on vite-plus 1.0.0 through the catalog, with `vitest` 5.0.3. Scripts run `vp run -r`, `vp check`, and `vp fmt`. Every CI job runs on Blacksmith runners (`blacksmith-4vcpu-ubuntu-2404`) that the fork does not have, so test PRs get no checks; validate locally."
+      "notes": "Kaneo project management app (pnpm 10 workspace, `onlyBuiltDependencies`) on vite-plus 1.0.0 through the catalog, with `vitest` 5.0.3. Scripts run `vp run -r`, `vp check`, and `vp fmt`. Every CI job runs on Blacksmith runners (`blacksmith-4vcpu-ubuntu-2404`) that the fork does not have, so test PRs get no checks; validate locally. GitHub disabled Actions on this fork: no workflow has run since the v1.7.0 smoke PR on 2026-11-16, and `gh workflow run` fails with `Actions has been disabled for this repository`. Keep it for local verification: run the `vp migrate` harness, then `vp check` and `vp run -r build` against the preview; both passed in the v1.8.0 sweep. Its other CI jobs need Docker or Gradle."
     },
     {
       "name": "local-studio",
@@ -664,7 +664,7 @@
       "branch": "main",
       "packageManager": "npm",
       "monorepo": true,
-      "notes": ""
+      "notes": "GitHub disabled Actions on this fork: no workflow has run since 2026-11-10, and the v1.7.0 smoke PR got no run, also after a close and reopen. Keep it for local verification: run the `vp migrate` harness, then its main CI commands against the preview (`vp install`, `npm run bootstrap`, `npm run lint`, and `vp test`; `cargo test` covers only the Rust crates). All four passed in the v1.7.0 sweep."
     },
     {
       "name": "yielded-auth",
