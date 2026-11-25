@@ -283,6 +283,14 @@
       "notes": "project-side: a package imports `esbuild` without declaring it and only resolves it through hoisting, so it fails with `Cannot find package 'esbuild'` whenever the lockfile is regenerated. Unrelated to vite-plus."
     },
     {
+      "name": "mirrordown",
+      "upstream": "mirrordown/mirrordown",
+      "branch": "main",
+      "packageManager": "yarn",
+      "monorepo": true,
+      "notes": "Yarn 4.17 workspace. The Yarn catalog pins vite-plus 1.4.0 and Vitest 5.0.5. On pull requests to `main`, `ci.yml` uses `setup-vp` with Node 24 to build the packages and run `vp check` and `vp test` without secrets. For fresh preview builds, add `vite-plus` and `@voidzero-dev/*` to `npmPreapprovedPackages` on the test branch to allow installation during Yarn's one-day age gate."
+    },
+    {
       "name": "museeks",
       "upstream": "martpie/museeks",
       "branch": "master",
